@@ -1,0 +1,190 @@
+<?php
+/**
+ * "Linked open data" page block — the visitor-facing view of the dataset.
+ *
+ * Content before apparatus: what the dataset is and what it holds come first,
+ * then the two ways in (the dump, and per-resource URIs), then the links to
+ * other datasets and the vocabulary list as reference material. Every colour,
+ * size and space comes from the DRE theme tokens (asset/css/dre-linked-data.css).
+ *
+ * @var \Laminas\View\Renderer\PhpRenderer $this
+ * @var \Omeka\Api\Representation\SitePageBlockRepresentation $block
+ * @var string $heading
+ * @var array<string,mixed> $summary see DRELinkedData\Dataset\DatasetSummary::build()
+ */
+
+$escape = $this->plugin('escapeHtml');
+$escapeAttr = $this->plugin('escapeHtmlAttr');
+$translate = $this->plugin('translate');
+
+$locale = (string) $this->lang();
+$numberFormatter = class_exists(\NumberFormatter::class) ? new \NumberFormatter($locale ?: 'en', \NumberFormatter::DECIMAL) : null;
+$number = static fn (int $value): string => $numberFormatter ? (string) $numberFormatter->format($value) : number_format($value);
+$bytes = static function (int $value) use ($numberFormatter): string {
+    $units = ['B', 'KB', 'MB', 'GB'];
+    $size = (float) $value;
+    $unit = 0;
+    while ($size >= 1024 && $unit < count($units) - 1) {
+        $size /= 1024;
+        $unit++;
+    }
+    $rounded = round($size, $unit === 0 ? 0 : 1);
+    $formatted = $numberFormatter ? (string) $numberFormatter->format($rounded) : (string) $rounded;
+    return $formatted . ' ' . $units[$unit];
+};
+
+$blockId = 'dre-ld-' . $block->id();
+$hasHeading = $heading !== '';
+$sub = $hasHeading ? 'h3' : 'h2';
+
+$generated = null;
+if (!empty($summary['generatedAt'])) {
+    try {
+        $generated = $this->i18n()->dateFormat(new \DateTime((string) $summary['generatedAt']), 'long', 'short');
+    } catch (\Exception $e) {
+        $generated = null;
+    }
+}
+$stats = [
+    ['label' => $translate('Items'), 'value' => $summary['resources']['items']],
+    ['label' => $translate('Item sets'), 'value' => $summary['resources']['itemSets']],
+    ['label' => $translate('Media'), 'value' => $summary['resources']['media']],
+    ['label' => $translate('Triples'), 'value' => (int) $summary['triples']],
+];
+?>
+<section class="dre-ld"<?php echo $hasHeading ? ' aria-labelledby="' . $escapeAttr($blockId . '-title') . '"' : ''; ?>>
+    <?php if ($hasHeading): ?>
+    <h2 class="dre-ld__heading" id="<?php echo $escapeAttr($blockId . '-title'); ?>"><?php echo $escape($heading); ?></h2>
+    <?php endif; ?>
+
+    <?php if ($summary['description'] !== ''): ?>
+    <p class="dre-ld__lede"><?php echo $escape($summary['description']); ?></p>
+    <?php endif; ?>
+
+    <?php if ($summary['available']): ?>
+    <dl class="dre-ld__stats">
+        <?php foreach ($stats as $stat): ?>
+        <div class="dre-ld__stat">
+            <dt class="dre-ld__stat-label"><?php echo $escape($stat['label']); ?></dt>
+            <dd class="dre-ld__stat-value"><?php echo $escape($number((int) $stat['value'])); ?></dd>
+        </div>
+        <?php endforeach; ?>
+    </dl>
+    <?php else: ?>
+    <p class="dre-ld__notice">
+        <?php echo $escape($translate('The full data dump has not been published yet. Every public record is already available as Linked Data through its resource URI, described below.')); ?>
+    </p>
+    <?php endif; ?>
+
+    <?php if ($generated || $summary['licence'] || $summary['publisherName'] !== ''): ?>
+    <dl class="dre-ld__facts">
+        <?php if ($summary['publisherName'] !== ''): ?>
+        <div class="dre-ld__fact">
+            <dt><?php echo $escape($translate('Publisher')); ?></dt>
+            <dd><?php if ($summary['publisherUri']): ?><a href="<?php echo $escapeAttr($summary['publisherUri']); ?>"><?php echo $escape($summary['publisherName']); ?></a><?php else: echo $escape($summary['publisherName']); endif; ?></dd>
+        </div>
+        <?php endif; ?>
+        <?php if ($summary['licence']): ?>
+        <div class="dre-ld__fact">
+            <dt><?php echo $escape($translate('Metadata licence')); ?></dt>
+            <dd><a href="<?php echo $escapeAttr($summary['licence']); ?>" rel="license"><?php echo $escape($summary['licenceLabel']); ?></a></dd>
+        </div>
+        <?php endif; ?>
+        <?php if ($generated): ?>
+        <div class="dre-ld__fact">
+            <dt><?php echo $escape($translate('Dump generated')); ?></dt>
+            <dd><time datetime="<?php echo $escapeAttr((string) $summary['generatedAt']); ?>"><?php echo $escape($generated); ?></time></dd>
+        </div>
+        <?php endif; ?>
+    </dl>
+    <?php endif; ?>
+
+    <div class="dre-ld__grid">
+        <section class="dre-ld__panel" aria-labelledby="<?php echo $escapeAttr($blockId . '-download'); ?>">
+            <<?php echo $sub; ?> class="dre-ld__panel-title" id="<?php echo $escapeAttr($blockId . '-download'); ?>"><?php echo $escape($translate('Download the dataset')); ?></<?php echo $sub; ?>>
+            <?php if ($summary['available']): ?>
+            <p class="dre-ld__text"><?php echo $escape($translate('The complete public graph as gzipped N-Triples, ready to load into a triplestore such as Apache Jena Fuseki.')); ?></p>
+            <p class="dre-ld__actions">
+                <a class="button dre-ld__button" href="<?php echo $escapeAttr($summary['dumpUrl']); ?>" download>
+                    <?php echo $escape($translate('Download N-Triples')); ?>
+                    <span class="dre-ld__button-meta"><?php echo $escape('.nt.gz · ' . $bytes((int) $summary['bytes'])); ?></span>
+                </a>
+            </p>
+            <?php if ($summary['sha256']): ?>
+            <p class="dre-ld__checksum">
+                <span class="dre-ld__checksum-label"><?php echo $escape($translate('SHA-256')); ?></span>
+                <code class="dre-ld__hash"><?php echo $escape($summary['sha256']); ?></code>
+            </p>
+            <?php endif; ?>
+            <?php else: ?>
+            <p class="dre-ld__text"><?php echo $escape($translate('The dump will appear here once it has been generated.')); ?></p>
+            <?php endif; ?>
+
+            <p class="dre-ld__text"><?php echo $escape($translate('The dataset description (VoID and DCAT) lists the vocabularies, the links to other datasets and the current figures:')); ?></p>
+            <ul class="dre-ld__formats" aria-label="<?php echo $escapeAttr($translate('Dataset description formats')); ?>">
+                <?php foreach ($summary['void'] as $document): ?>
+                <li><a class="dre-ld__format" href="<?php echo $escapeAttr($document['url']); ?>" type="<?php echo $escapeAttr($document['type']); ?>"><?php echo $escape($document['label']); ?></a></li>
+                <?php endforeach; ?>
+            </ul>
+        </section>
+
+        <section class="dre-ld__panel" aria-labelledby="<?php echo $escapeAttr($blockId . '-uris'); ?>">
+            <<?php echo $sub; ?> class="dre-ld__panel-title" id="<?php echo $escapeAttr($blockId . '-uris'); ?>"><?php echo $escape($translate('Resource URIs')); ?></<?php echo $sub; ?>>
+            <p class="dre-ld__text"><?php echo $escape($translate('Every public item, item set and media has a permanent identifier:')); ?></p>
+            <p class="dre-ld__pattern"><code><?php echo $escape($summary['uriPattern']); ?></code></p>
+            <p class="dre-ld__text"><?php echo $escape($translate('Opened in a browser, it leads to the record page. Requested by a Linked Data client, it returns RDF in the format asked for.')); ?></p>
+            <?php if ($summary['example']): ?>
+            <p class="dre-ld__text">
+                <?php echo $escape($translate('Example:')); ?>
+                <a href="<?php echo $escapeAttr($summary['example']['uri']); ?>"><code><?php echo $escape($summary['example']['uri']); ?></code></a>
+            </p>
+            <ul class="dre-ld__formats" aria-label="<?php echo $escapeAttr($translate('Example record formats')); ?>">
+                <?php foreach ($summary['example']['documents'] as $document): ?>
+                <li><a class="dre-ld__format" href="<?php echo $escapeAttr($document['url']); ?>" type="<?php echo $escapeAttr($document['type']); ?>"><?php echo $escape($document['label']); ?></a></li>
+                <?php endforeach; ?>
+            </ul>
+            <pre class="dre-ld__code"><code><?php echo $escape('curl -L -H "Accept: text/turtle" ' . $summary['example']['uri']); ?></code></pre>
+            <?php endif; ?>
+        </section>
+    </div>
+
+    <?php if ($summary['linksets']): ?>
+    <section class="dre-ld__panel" aria-labelledby="<?php echo $escapeAttr($blockId . '-links'); ?>">
+        <<?php echo $sub; ?> class="dre-ld__panel-title" id="<?php echo $escapeAttr($blockId . '-links'); ?>"><?php echo $escape($translate('Links to other datasets')); ?></<?php echo $sub; ?>>
+        <div class="dre-ld__table-wrap">
+            <table class="dre-ld__table">
+                <thead>
+                    <tr>
+                        <th scope="col"><?php echo $escape($translate('Dataset')); ?></th>
+                        <th scope="col"><?php echo $escape($translate('Link')); ?></th>
+                        <th scope="col" class="dre-ld__numeric"><?php echo $escape($translate('Links')); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($summary['linksets'] as $linkset): ?>
+                    <tr>
+                        <th scope="row"><?php echo $escape($linkset['label']); ?></th>
+                        <td><code><?php echo $escape($linkset['predicate']); ?></code></td>
+                        <td class="dre-ld__numeric"><?php echo $escape($number((int) $linkset['triples'])); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </section>
+    <?php endif; ?>
+
+    <?php if ($summary['vocabularies']): ?>
+    <details class="dre-ld__vocabularies">
+        <summary><?php echo $escape(sprintf($translate('Vocabularies used (%s)'), $number(count($summary['vocabularies'])))); ?></summary>
+        <dl class="dre-ld__vocabulary-list">
+            <?php foreach ($summary['vocabularies'] as $vocabulary): ?>
+            <div class="dre-ld__vocabulary">
+                <dt><code><?php echo $escape($vocabulary['prefix'] !== '' ? $vocabulary['prefix'] . ':' : '—'); ?></code></dt>
+                <dd><code><?php echo $escape($vocabulary['namespace']); ?></code></dd>
+            </div>
+            <?php endforeach; ?>
+        </dl>
+    </details>
+    <?php endif; ?>
+</section>

@@ -1,0 +1,39 @@
+<?php
+/**
+ * Status panel above the module configuration form (Omeka admin styles).
+ *
+ * @var \Laminas\View\Renderer\PhpRenderer $this
+ * @var array<string,mixed> $summary see DRELinkedData\Dataset\DatasetSummary::build()
+ */
+
+$escape = $this->plugin('escapeHtml');
+$escapeAttr = $this->plugin('escapeHtmlAttr');
+$translate = $this->plugin('translate');
+?>
+<fieldset class="dre-ld-status">
+    <legend><?php echo $escape($translate('Linked Data dump')); ?></legend>
+    <?php if ($summary['available']): ?>
+    <p>
+        <?php echo $escape(sprintf(
+            $translate('Last generated %1$s: %2$s triples for %3$s items, %4$s item sets and %5$s media (%6$s bytes).'),
+            $this->i18n()->dateFormat(new \DateTime((string) $summary['generatedAt']), 'medium', 'short'),
+            number_format((int) $summary['triples']),
+            number_format($summary['resources']['items']),
+            number_format($summary['resources']['itemSets']),
+            number_format($summary['resources']['media']),
+            number_format((int) $summary['bytes'])
+        )); ?>
+    </p>
+    <?php else: ?>
+    <p><?php echo $escape($translate('No dump has been generated yet. Tick "Generate the dump now" below and save.')); ?></p>
+    <?php endif; ?>
+    <ul>
+        <li><a href="<?php echo $escapeAttr($summary['voidUrl']); ?>" target="_blank" rel="noopener"><?php echo $escape($translate('Dataset description (VoID/DCAT)')); ?></a></li>
+        <?php if ($summary['available']): ?>
+        <li><a href="<?php echo $escapeAttr($summary['dumpUrl']); ?>"><?php echo $escape($translate('Download the dump')); ?></a></li>
+        <?php endif; ?>
+        <?php if ($summary['example']): ?>
+        <li><a href="<?php echo $escapeAttr($summary['example']['documents'][0]['url']); ?>" target="_blank" rel="noopener"><?php echo $escape(sprintf($translate('Example resource #%d (Turtle)'), $summary['example']['id'])); ?></a></li>
+        <?php endif; ?>
+    </ul>
+</fieldset>

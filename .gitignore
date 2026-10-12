@@ -1,0 +1,10 @@
+# Composer (this module ships no third-party dependencies; vendor/ is never committed)
+/vendor/
+composer.lock
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

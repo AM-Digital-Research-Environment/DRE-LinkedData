@@ -1,0 +1,196 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * DRE Linked Data module configuration.
+ *
+ * Wires the public Linked Data endpoints (top-level routes that fall through
+ * nginx's `try_files … /index.php` to Omeka, like DRE SEO's sitemap), the
+ * page block, the view helper the theme can call, and the instance-specific
+ * `dre_linked_data` block (overridable, key by key, via config/local.config.php).
+ */
+
+namespace DRELinkedData;
+
+use Laminas\Router\Http\Literal;
+use Laminas\Router\Http\Segment;
+
+return [
+    'service_manager' => [
+        'factories' => [
+            Projection\OmekaSource::class => Service\Factory::class,
+            Projection\UriScheme::class => Service\Factory::class,
+            Projection\IdentityLinks::class => Service\Factory::class,
+            Projection\ResourceProjector::class => Service\Factory::class,
+            Rdf\RdfWriter::class => Service\Factory::class,
+            Dump\DumpStore::class => Service\Factory::class,
+            Dump\DumpGenerator::class => Service\Factory::class,
+            Dataset\DatasetDescription::class => Service\Factory::class,
+            Dataset\DatasetSummary::class => Service\Factory::class,
+            Service\DefaultSite::class => Service\Factory::class,
+        ],
+    ],
+
+    'controllers' => [
+        'factories' => [
+            Controller\ResourceController::class => Service\Factory::class,
+            Controller\DatasetController::class => Service\Factory::class,
+        ],
+    ],
+
+    'block_layouts' => [
+        'factories' => [
+            'dreLinkedData' => Service\Factory::class,
+        ],
+    ],
+
+    // dreLinkedData($resource) — the resource's URI and RDF documents, for the
+    // theme's record apparatus. The theme guards on the helper's existence.
+    'view_helpers' => [
+        'factories' => [
+            View\Helper\LinkedData::class => Service\Factory::class,
+        ],
+        'aliases' => [
+            'dreLinkedData' => View\Helper\LinkedData::class,
+        ],
+    ],
+
+    'form_elements' => [
+        'invokables' => [
+            Form\ConfigForm::class => Form\ConfigForm::class,
+        ],
+    ],
+
+    'router' => [
+        'routes' => [
+            // /resource/{id} (303) and /resource/{id}.{ttl|nt|jsonld}.
+            'dre-linked-data-resource' => [
+                'type' => Segment::class,
+                'options' => [
+                    'route' => '/resource/:id[.:format]',
+                    'constraints' => ['id' => '\d+', 'format' => 'ttl|nt|jsonld'],
+                    'defaults' => [
+                        'controller' => Controller\ResourceController::class,
+                        'action' => 'index',
+                    ],
+                ],
+            ],
+            'dre-linked-data-void' => [
+                'type' => Segment::class,
+                'options' => [
+                    'route' => '/linked-data/void[.:format]',
+                    'constraints' => ['format' => 'ttl|nt|jsonld'],
+                    'defaults' => [
+                        'controller' => Controller\DatasetController::class,
+                        'action' => 'void',
+                    ],
+                ],
+            ],
+            'dre-linked-data-dump' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route' => '/linked-data/dump.nt.gz',
+                    'defaults' => [
+                        'controller' => Controller\DatasetController::class,
+                        'action' => 'dump',
+                    ],
+                ],
+            ],
+            // The VoID well-known location. Note the AMIRA nginx config denies
+            // every dot-path; it needs an exception for /.well-known/ to reach this.
+            'dre-linked-data-well-known' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route' => '/.well-known/void',
+                    'defaults' => [
+                        'controller' => Controller\DatasetController::class,
+                        'action' => 'wellKnown',
+                    ],
+                ],
+            ],
+        ],
+    ],
+
+    'view_manager' => [
+        'template_path_stack' => [
+            __DIR__ . '/../view',
+        ],
+    ],
+
+    // ── Instance configuration (override via config/local.config.php) ───────
+    'dre_linked_data' => [
+        'projection' => [
+            // Never published, even when a value is marked public: the sync's
+            // reconciliation key, the data-sensitivity level and internal
+            // filenames. Omeka already keeps them private; this is the second lock.
+            'excluded_terms' => ['dre:mongoId', 'dre:security', 'dre:bitstream'],
+
+            // rdf:type added to every item set / media, beside any resource class.
+            'item_set_classes' => ['http://purl.org/dc/dcmitype/Collection'],
+            'media_classes' => ['https://schema.org/MediaObject'],
+
+            'identity_links' => [
+                // Properties whose URI values are checked against the authorities.
+                'properties' => ['dcterms:identifier'],
+                'default_predicate' => 'http://www.w3.org/2002/07/owl#sameAs',
+                // Authority Resources (subjects, languages, genres, …) are
+                // concepts, matched rather than identical — see
+                // MongoDB2OmekaS config/profiles/amira.json for the template id.
+                'template_predicates' => [
+                    6 => 'http://www.w3.org/2004/02/skos/core#exactMatch',
+                ],
+                // pattern: PCRE matched against the stored URI; canonical: its
+                // replacement (the authority's own entity IRI); dataset: the
+                // target dataset in VoID linksets.
+                'authorities' => [
+                    'wikidata' => [
+                        'label' => 'Wikidata',
+                        'pattern' => '~^https?://www\.wikidata\.org/(?:entity|wiki)/(Q[1-9][0-9]*)$~',
+                        'canonical' => 'http://www.wikidata.org/entity/$1',
+                        'dataset' => 'https://www.wikidata.org/',
+                    ],
+                    'loc' => [
+                        'label' => 'Library of Congress',
+                        'pattern' => '~^https?://id\.loc\.gov/authorities/(subjects|names|genreForms)/([a-z]+[0-9]+)(?:\.html)?$~',
+                        'canonical' => 'http://id.loc.gov/authorities/$1/$2',
+                        'dataset' => 'http://id.loc.gov/',
+                    ],
+                    'gnd' => [
+                        'label' => 'GND',
+                        'pattern' => '~^https?://d-nb\.info/gnd/([0-9X-]+)$~',
+                        'canonical' => 'https://d-nb.info/gnd/$1',
+                        'dataset' => 'https://d-nb.info/gnd/',
+                    ],
+                    'viaf' => [
+                        'label' => 'VIAF',
+                        'pattern' => '~^https?://(?:www\.)?viaf\.org/viaf/([0-9]+)/?$~',
+                        'canonical' => 'http://viaf.org/viaf/$1',
+                        'dataset' => 'http://viaf.org/',
+                    ],
+                    'orcid' => [
+                        'label' => 'ORCID',
+                        'pattern' => '~^https?://orcid\.org/([0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X])$~',
+                        'canonical' => 'https://orcid.org/$1',
+                        'dataset' => 'https://orcid.org/',
+                    ],
+                    'ror' => [
+                        'label' => 'ROR',
+                        'pattern' => '~^https?://ror\.org/(0[a-z0-9]{8})$~',
+                        'canonical' => 'https://ror.org/$1',
+                        'dataset' => 'https://ror.org/',
+                    ],
+                    'geonames' => [
+                        'label' => 'GeoNames',
+                        'pattern' => '~^https?://(?:www\.|sws\.)?geonames\.org/([0-9]+)(?:/.*)?$~',
+                        'canonical' => 'https://sws.geonames.org/$1/',
+                        'dataset' => 'https://www.geonames.org/',
+                    ],
+                ],
+            ],
+        ],
+        'dump' => [
+            // Resources projected per batch; each batch is a handful of queries.
+            'batch_size' => 250,
+        ],
+    ],
+];

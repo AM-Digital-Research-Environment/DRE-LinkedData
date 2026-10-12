@@ -1,0 +1,363 @@
+/*
+ * DRE Linked Data — the "Linked open data" page block.
+ *
+ * Built on the DRE theme's token API (DRE-theme DESIGN.md and
+ * docs/DESIGN-INTEGRATION.md). Every var() carries the theme's own value from
+ * dre-tokens-fallback.json as its fallback — tests/DesignTokenTest.php holds
+ * them to it — so the block still renders sensibly outside the theme. There are
+ * no mode branches: the semantic tokens already resolve for light and dark.
+ *
+ * The theme's own `.button`, `pre` and table rules are reused, not restyled;
+ * the rules here add the block's layout, panels, count tiles and format chips.
+ * Layout follows the block's own width (container queries), because a page
+ * block can sit in a full-width section or a narrow column.
+ */
+
+.dre-ld {
+    container: dre-ld / inline-size;
+    display: grid;
+    /* An implicit `auto` track grows to its widest child's min-content (a long
+       URI, a checksum); pinning it keeps every child inside a 320px viewport. */
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-6, 1.5rem);
+    margin-block: var(--space-8, 2rem);
+    color: var(--ink, #3c342d);
+    font-family: var(--font-body, "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif);
+}
+
+/* The grid gap owns the vertical rhythm. */
+.dre-ld > *,
+.dre-ld__panel > * {
+    margin: 0;
+}
+
+.dre-ld__lede {
+    max-width: var(--measure-narrow, 44rem);
+    font-size: var(--text-lg, 1.1875rem);
+    line-height: var(--leading-relaxed, 1.75);
+}
+
+/* ── Corpus counts: sunken tiles, like the masthead's catalogue column ───── */
+
+.dre-ld__stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3, 0.75rem);
+}
+
+@container dre-ld (min-width: 37.5rem) {
+    .dre-ld__stats {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+.dre-ld__stat {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: var(--space-1, 0.25rem);
+    min-width: 0;
+    padding: var(--space-4, 1rem);
+    background: var(--surface-sunken, #f3f0eb);
+    border-radius: var(--radius-lg, 0.75rem);
+}
+
+.dre-ld__stat-label {
+    color: var(--ink-light, #5f5650);
+    font-size: var(--text-xs, 0.8125rem);
+    font-weight: 600;
+    letter-spacing: var(--tracking-wide, 0.04em);
+    text-transform: uppercase;
+}
+
+.dre-ld__stat-value {
+    margin: 0;
+    color: var(--ink-strong, #261d15);
+    font-family: var(--font-display, "Spectral", Georgia, "Times New Roman", serif);
+    font-size: var(--text-2xl, 1.875rem);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    line-height: var(--leading-tight, 1.1);
+    overflow-wrap: anywhere;
+}
+
+/* ── Publisher / licence / date ─────────────────────────────────────────── */
+
+.dre-ld__facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2, 0.5rem) var(--space-6, 1.5rem);
+    font-size: var(--text-sm, 0.9375rem);
+}
+
+.dre-ld__fact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2, 0.5rem);
+    align-items: baseline;
+    min-width: 0;
+}
+
+.dre-ld__fact dt {
+    color: var(--ink-light, #5f5650);
+    font-weight: 600;
+}
+
+.dre-ld__fact dd {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+/* Before the first dump: the per-resource route already works, say so. */
+.dre-ld__notice {
+    max-width: var(--measure-base, 52.5rem);
+    padding: var(--space-4, 1rem);
+    background: var(--info-bg, #dff6ff);
+    border: 1px solid var(--border, #dbd7d1);
+    border-radius: var(--radius-md, 0.5rem);
+    line-height: var(--leading-normal, 1.6);
+}
+
+/* ── Panels ────────────────────────────────────────────────────────────── */
+
+.dre-ld__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4, 1rem);
+}
+
+@container dre-ld (min-width: 48rem) {
+    .dre-ld__grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Flat by default: tone and a complete hairline frame, no shadow. */
+.dre-ld__panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: var(--space-3, 0.75rem);
+    min-width: 0;
+    padding: var(--space-5, 1.25rem);
+    background: var(--surface, #fdfcf9);
+    border: 1px solid var(--border, #dbd7d1);
+    border-radius: var(--radius-lg, 0.75rem);
+}
+
+.dre-ld__panel-title {
+    color: var(--ink-strong, #261d15);
+    font-family: var(--font-display, "Spectral", Georgia, "Times New Roman", serif);
+    font-size: var(--text-xl, 1.5rem);
+    line-height: var(--leading-snug, 1.25);
+}
+
+.dre-ld__text {
+    line-height: var(--leading-normal, 1.6);
+}
+
+.dre-ld__text code {
+    overflow-wrap: anywhere;
+}
+
+.dre-ld__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2, 0.5rem);
+}
+
+/* The theme's primary `.button`, laid out to carry the file size. */
+.dre-ld__button {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--space-2, 0.5rem);
+    align-items: baseline;
+    min-height: var(--size-control-lg, 2.75rem);
+}
+
+.dre-ld__button-meta {
+    font-size: var(--text-xs, 0.8125rem);
+    font-variant-numeric: tabular-nums;
+    font-weight: 400;
+}
+
+.dre-ld__checksum {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+    align-items: baseline;
+    color: var(--ink-light, #5f5650);
+    font-size: var(--text-xs, 0.8125rem);
+}
+
+.dre-ld__checksum-label {
+    font-weight: 600;
+}
+
+.dre-ld__hash {
+    min-width: 0;
+    color: var(--ink, #3c342d);
+    font-family: var(--font-mono, ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", monaco, consolas, monospace);
+    word-break: break-all;
+}
+
+.dre-ld__pattern {
+    padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+    background: var(--surface-sunken, #f3f0eb);
+    border-radius: var(--radius-md, 0.5rem);
+    font-size: var(--text-sm, 0.9375rem);
+    overflow-wrap: anywhere;
+}
+
+/* ── Format chips (Turtle · N-Triples · JSON-LD) ───────────────────────── */
+
+.dre-ld__formats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2, 0.5rem);
+    padding: 0;
+    list-style: none;
+}
+
+.dre-ld__format {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--size-control-md, 2.5rem);
+    padding-inline: var(--space-4, 1rem);
+    background: var(--surface, #fdfcf9);
+    border: 1px solid var(--border-strong, #bfbab3);
+    border-radius: var(--radius-full, 9999px);
+    font-size: var(--text-sm, 0.9375rem);
+    font-weight: 600;
+    text-decoration: none;
+    transition:
+        background-color var(--transition-fast, 150ms cubic-bezier(0.25, 1, 0.5, 1)),
+        border-color var(--transition-fast, 150ms cubic-bezier(0.25, 1, 0.5, 1));
+}
+
+.dre-ld__format:hover {
+    background: var(--primary-muted, #e4f0e6);
+    border-color: var(--primary, #007a50);
+}
+
+/* The theme's pre: sunken ground, full frame. Tighter, and wrapped rather
+   than scrolled, so a long URI never pushes the page sideways. */
+.dre-ld__code {
+    padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+    font-size: var(--text-sm, 0.9375rem);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* ── Linksets ─────────────────────────────────────────────────────────── */
+
+.dre-ld__table-wrap {
+    overflow-x: auto;
+}
+
+.dre-ld__table {
+    margin: 0;
+    border-collapse: collapse;
+    font-size: var(--text-sm, 0.9375rem);
+}
+
+.dre-ld__table th,
+.dre-ld__table td {
+    padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+    border-bottom: 1px solid var(--border-light, #eae8e3);
+    text-align: start;
+}
+
+.dre-ld__table thead th {
+    color: var(--ink-light, #5f5650);
+    font-size: var(--text-xs, 0.8125rem);
+    font-weight: 600;
+    letter-spacing: var(--tracking-wide, 0.04em);
+    text-transform: uppercase;
+}
+
+.dre-ld__table .dre-ld__numeric {
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+}
+
+/* ── Vocabularies (reference material, collapsed) ─────────────────────── */
+
+.dre-ld__vocabularies {
+    padding: var(--space-3, 0.75rem) var(--space-5, 1.25rem);
+    background: var(--surface, #fdfcf9);
+    border: 1px solid var(--border, #dbd7d1);
+    border-radius: var(--radius-lg, 0.75rem);
+}
+
+/* The theme's disclosure head: the whole bar toggles, and the native triangle
+   gives way to a chevron that points down when closed and flips up when open.
+   Drawn as a mask filled with a token, so it follows the mode like text does. */
+.dre-ld__vocabularies > summary {
+    display: flex;
+    gap: var(--space-3, 0.75rem);
+    align-items: center;
+    min-height: var(--size-control-md, 2.5rem);
+    cursor: pointer;
+    font-weight: 600;
+    list-style: none;
+}
+
+.dre-ld__vocabularies > summary::-webkit-details-marker {
+    display: none;
+}
+
+.dre-ld__vocabularies > summary::after {
+    flex-shrink: 0;
+    width: var(--space-3, 0.75rem);
+    height: var(--space-3, 0.75rem);
+    margin-inline-start: auto;
+    background-color: var(--ink-light, #5f5650);
+    content: "";
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+    transition:
+        transform var(--transition-base, 200ms cubic-bezier(0.25, 1, 0.5, 1)),
+        background-color var(--transition-fast, 150ms cubic-bezier(0.25, 1, 0.5, 1));
+}
+
+.dre-ld__vocabularies > summary:hover::after {
+    background-color: var(--primary, #007a50);
+}
+
+.dre-ld__vocabularies[open] > summary::after {
+    transform: rotate(180deg);
+}
+
+.dre-ld__vocabulary-list {
+    display: grid;
+    gap: var(--space-2, 0.5rem);
+    margin: var(--space-3, 0.75rem) 0 0;
+    font-size: var(--text-sm, 0.9375rem);
+}
+
+.dre-ld__vocabulary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
+    min-width: 0;
+}
+
+.dre-ld__vocabulary dt {
+    min-width: var(--space-24, 6rem);
+    font-weight: 600;
+}
+
+.dre-ld__vocabulary dd {
+    min-width: 0;
+    margin: 0;
+    color: var(--ink-light, #5f5650);
+    overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dre-ld__format,
+    .dre-ld__vocabularies > summary::after {
+        transition: none;
+    }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "am-digital-research-environment/dre-linked-data",
+  "description": "Linked Open Data for the Africa Multiple DRE Omeka S instance: dereferenceable resource URIs with content negotiation, a clean RDF projection with authority links, an N-Triples dump and a VoID/DCAT dataset description.",
+  "type": "omeka-module",
+  "license": "GPL-3.0-or-later",
+  "homepage": "https://github.com/AM-Digital-Research-Environment/DRE-LinkedData",
+  "authors": [
+    {
+      "name": "Frédérick Madore",
+      "homepage": "https://www.frederickmadore.com/",
+      "role": "Developer"
+    }
+  ],
+  "require": {
+    "php": ">=8.2",
+    "ext-json": "*",
+    "ext-zlib": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "DRELinkedData\\": "src/"
+    }
+  },
+  "scripts": {
+    "lint": "@php tests/lint.php",
+    "lint:tokens": "node scripts/check-design-tokens.mjs",
+    "test": "@php tests/run.php",
+    "integration": "@php tests/integration/omeka-smoke.php",
+    "check": [
+      "@lint",
+      "@lint:tokens",
+      "@test"
+    ]
+  }
+}
