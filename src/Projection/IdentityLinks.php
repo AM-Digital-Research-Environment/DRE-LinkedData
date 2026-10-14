@@ -16,6 +16,10 @@ namespace DRELinkedData\Projection;
  * Only configured authorities qualify. Authority items also carry YouTube
  * playlist and GEPRIS URLs under dcterms:identifier, and those are not the
  * same thing as the concept, so an allowlist rather than "any URI" is the rule.
+ *
+ * DOIs are handled apart ({@see doi()}): they sit in their own property
+ * (bibo:doi), identify the work's published version rather than the record,
+ * and link with schema:sameAs.
  */
 final class IdentityLinks
 {
@@ -55,10 +59,45 @@ final class IdentityLinks
         return null;
     }
 
-    /** @return array<string,array<string,string>> authority => definition */
+    public function holdsDoi(string $term): bool
+    {
+        return in_array($term, (array) ($this->config['doi']['properties'] ?? []), true);
+    }
+
+    /**
+     * A DOI stored bare (`10.1017/…`), with a `doi:` prefix or as a resolver
+     * URL (`https://doi.org/…`, `http://dx.doi.org/…`), as the bare DOI and its
+     * link to the https://doi.org/ IRI.
+     *
+     * @return array{doi:string,authority:string,iri:string,predicate:string}|null
+     */
+    public function doi(string $value): ?array
+    {
+        if (!preg_match('~^(?:https?://(?:dx\.)?doi\.org/|doi:\s*)?(10\.[0-9]{4,9}/\S+)$~i', trim($value), $match)) {
+            return null;
+        }
+        $doi = rawurldecode($match[1]);
+        return [
+            'doi' => $doi,
+            'authority' => 'doi',
+            'iri' => 'https://doi.org/' . $doi,
+            'predicate' => (string) ($this->config['doi']['predicate'] ?? 'https://schema.org/sameAs'),
+        ];
+    }
+
+    /**
+     * The link targets, for VoID linksets and the page block: the configured
+     * authorities, plus `doi` when DOI properties are configured.
+     *
+     * @return array<string,array<string,mixed>> authority => definition
+     */
     public function authorities(): array
     {
-        return (array) ($this->config['authorities'] ?? []);
+        $authorities = (array) ($this->config['authorities'] ?? []);
+        if (!empty($this->config['doi']['properties'])) {
+            $authorities['doi'] = (array) $this->config['doi'];
+        }
+        return $authorities;
     }
 
     private function predicateFor(?int $templateId): string

@@ -24,7 +24,60 @@ test('a research item keeps its values and drops Omeka bookkeeping', function ()
     assertContainsText('<http://am-digital.org/ontology/dre/collectionUrl> <https://collections.uni-bayreuth.de/example/beier-volume-8> .', $nt);
     assertNotContainsText('omeka.org/s/vocabs/o#', $nt, 'no Omeka internals');
     assertNotContainsText('/api/items/', $nt, 'links use resource URIs, not API URLs');
-    assertNotContainsText('rdf-syntax-ns#type', $nt, 'a classless research item gets no invented type');
+});
+
+test('an item with no class gets the fallback class; classed items and sets do not', function (): void {
+    $type = '<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>';
+    assertContainsText(R . '7392> ' . $type . ' <https://schema.org/CreativeWork> .', projectedLines(7392));
+    assertNotContainsText('CreativeWork', projectedLines(149));
+    assertNotContainsText('CreativeWork', projectedLines(6259));
+});
+
+test('an authority file is published as a SKOS concept in the schemes of its item sets', function (): void {
+    $nt = projectedLines(2390);
+    assertContainsText(R . '2390> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2004/02/skos/core#Concept> .', $nt);
+    assertNotContainsText('AuthorityFile', $nt, 'a concept is not a document');
+    assertContainsText(R . '2390> <http://www.w3.org/2004/02/skos/core#prefLabel> "Yoruba (African people)" .', $nt);
+    assertContainsText(R . '2390> <http://www.w3.org/2004/02/skos/core#inScheme> ' . R . '6260> .', $nt);
+    assertNotContainsText('prefLabel', projectedLines(149), 'only concepts get SKOS labels');
+});
+
+test('full texts and transcripts are not published', function (): void {
+    $nt = projectedLines(7392);
+    assertNotContainsText('FULL TEXT', $nt);
+    assertNotContainsText('bibo/content', $nt);
+});
+
+test('an author list is a real rdf:List in value order, with flat creators', function (): void {
+    $nt = projectedLines(7392);
+    $rdf = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
+    $node = static fn (int $n): string => '<' . FIXTURE_BASE . '/resource/7392#authorList-' . $n . '>';
+    assertContainsText(R . '7392> <http://purl.org/ontology/bibo/authorList> ' . $node(1) . ' .', $nt);
+    assertContainsText($node(1) . ' <' . $rdf . 'first> ' . R . '149> .', $nt);
+    assertContainsText($node(1) . ' <' . $rdf . 'rest> ' . $node(2) . ' .', $nt);
+    assertContainsText($node(2) . ' <' . $rdf . 'first> "Doe, Jane" .', $nt);
+    assertContainsText($node(2) . ' <' . $rdf . 'rest> <' . $rdf . 'nil> .', $nt);
+    assertSameValue(1, substr_count($nt, '<http://purl.org/ontology/bibo/authorList>'), 'the list has one head');
+    assertContainsText(R . '7392> <http://purl.org/dc/terms/creator> ' . R . '149> .', $nt);
+    assertNotContainsText('<http://purl.org/dc/terms/creator> "Doe, Jane"', $nt, 'dcterms:creator wants an agent');
+    assertNotContainsText('authorList-3', $nt, 'a hidden author takes no place in the list');
+});
+
+test('a DOI is published bare and linked by its resolver IRI', function (): void {
+    $description = amiraProjector()->describeOne(7392);
+    $nt = projectedLines(7392);
+    assertContainsText(R . '7392> <http://purl.org/ontology/bibo/doi> "10.1017/S0021853721000372" .', $nt);
+    assertContainsText(R . '7392> <https://schema.org/sameAs> <https://doi.org/10.1017/S0021853721000372> .', $nt);
+    assertContainsText('<http://purl.org/ontology/bibo/doi> "10.1086/ahr/110.2.<123>" .', $nt, 'percent-encoding is undone in the literal');
+    assertContainsText('<https://schema.org/sameAs> <https://doi.org/10.1086/ahr/110.2.%3C123%3E> .', $nt, 'and restored in the IRI');
+    assertNotContainsText('<http://purl.org/ontology/bibo/doi> <', $nt, 'bibo:doi never holds an IRI');
+    assertSameValue(2, count(array_filter($description->identityLinks, static fn (array $link): bool => $link['authority'] === 'doi')));
+});
+
+test('coordinates are decimals when they are numbers', function (): void {
+    $nt = projectedLines(149);
+    assertContainsText('<http://www.w3.org/2003/01/geo/wgs84_pos#lat> "49.92885"^^<http://www.w3.org/2001/XMLSchema#decimal> .', $nt);
+    assertContainsText('<http://www.w3.org/2003/01/geo/wgs84_pos#lat> "about 50 degrees north" .', $nt);
 });
 
 test('duplicate values collapse to one triple', function (): void {
@@ -129,7 +182,7 @@ test('a batch asks for its own properties and classes, once', function (): void 
     assertSameValue(1, count($source->propertyRequests), 'one lookup per batch, not per resource');
     $requested = $source->propertyRequests[0];
     sort($requested);
-    assertSameValue([1, 3, 7, 10, 12, 106, 346, 500, 660, 661, 663, 666], $requested, 'exactly the properties the batch uses');
+    assertSameValue([1, 3, 7, 10, 12, 106, 110, 111, 112, 200, 346, 500, 660, 661, 663, 666], $requested, 'exactly the properties the batch uses');
     assertSameValue([[40]], $source->classRequests, 'only the person has a class');
 
     amiraProjector($source)->describe([]);

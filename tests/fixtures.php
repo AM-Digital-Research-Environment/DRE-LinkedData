@@ -29,6 +29,7 @@ function amiraSource(): FakeSource
         ['prefix' => 'fabio', 'namespace_uri' => 'http://purl.org/spar/fabio/'],
         ['prefix' => 'marcrel', 'namespace_uri' => 'http://id.loc.gov/vocabulary/relators/'],
         ['prefix' => 'dre', 'namespace_uri' => 'http://am-digital.org/ontology/dre/'],
+        ['prefix' => 'geo', 'namespace_uri' => 'http://www.w3.org/2003/01/geo/wgs84_pos#'],
     ];
     $source->propertyMap = [
         1 => ['iri' => 'http://purl.org/dc/terms/title', 'term' => 'dcterms:title'],
@@ -38,6 +39,10 @@ function amiraSource(): FakeSource
         12 => ['iri' => 'http://purl.org/dc/terms/language', 'term' => 'dcterms:language'],
         33 => ['iri' => 'http://purl.org/dc/terms/isPartOf', 'term' => 'dcterms:isPartOf'],
         106 => ['iri' => 'http://purl.org/ontology/bibo/numPages', 'term' => 'bibo:numPages'],
+        110 => ['iri' => 'http://purl.org/ontology/bibo/content', 'term' => 'bibo:content'],
+        111 => ['iri' => 'http://purl.org/ontology/bibo/authorList', 'term' => 'bibo:authorList'],
+        112 => ['iri' => 'http://purl.org/ontology/bibo/doi', 'term' => 'bibo:doi'],
+        200 => ['iri' => 'http://www.w3.org/2003/01/geo/wgs84_pos#lat', 'term' => 'geo:lat'],
         346 => ['iri' => 'http://purl.org/spar/fabio/hasTranslatedTitle', 'term' => 'fabio:hasTranslatedTitle'],
         500 => ['iri' => 'http://id.loc.gov/vocabulary/relators/aut', 'term' => 'marcrel:aut'],
         660 => ['iri' => 'http://am-digital.org/ontology/dre/id', 'term' => 'dre:id'],
@@ -82,6 +87,8 @@ function amiraSource(): FakeSource
     $source->valueRows = [
         $value(149, 1, 'literal', 'Ulli Beier'),
         $value(149, 10, 'uri', 'GND 124120881', 'https://d-nb.info/gnd/124120881'),
+        $value(149, 200, 'literal', '49.92885'),
+        $value(149, 200, 'literal', 'about 50 degrees north'),
 
         $value(2390, 1, 'literal', 'Yoruba (African people)'),
         $value(2390, 10, 'uri', 'sh85149367', 'http://id.loc.gov/authorities/subjects/sh85149367'),
@@ -110,8 +117,17 @@ function amiraSource(): FakeSource
         $value(7392, 661, 'resource:item', null, null, 4702, 1),
         $value(7392, 12, 'literal', '   '),
         $value(7392, 1, 'literal', 'Volume 8: Yoruba Architecture and Wall Painting'),
+        // Full text: never published, the licence covers the metadata only.
+        $value(7392, 110, 'literal', 'FULL TEXT OF THE VOLUME'),
+        // Authors in Omeka's value order: a person, a hidden person, a name
+        // the sync could not reconcile.
+        $value(7392, 111, 'resource:item', null, null, 149, 1),
+        $value(7392, 111, 'resource:item', null, null, 9999, 0),
+        $value(7392, 111, 'literal', 'Doe, Jane'),
+        $value(7392, 112, 'uri', null, 'https://doi.org/10.1017/S0021853721000372'),
+        $value(7392, 112, 'literal', 'doi:10.1086/ahr/110.2.%3C123%3E'),
     ];
-    $source->memberships = [['item_id' => 7392, 'item_set_id' => 6259]];
+    $source->memberships = [['item_id' => 2390, 'item_set_id' => 6260], ['item_id' => 7392, 'item_set_id' => 6259]];
     $source->itemMediaRows = [['item_id' => 7392, 'id' => 8001], ['item_id' => 7392, 'id' => 8002]];
     $source->mediaRows = [
         [

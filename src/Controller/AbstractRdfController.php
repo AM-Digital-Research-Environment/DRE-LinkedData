@@ -62,6 +62,23 @@ abstract class AbstractRdfController extends AbstractActionController
         return $response;
     }
 
+    /**
+     * 406, listing what the client could have asked for instead.
+     *
+     * @param string[] $offers
+     */
+    protected function notAcceptable(array $offers): Response
+    {
+        $response = $this->getResponse();
+        $response->setStatusCode(406);
+        $headers = $response->getHeaders();
+        $headers->addHeaderLine('Content-Type', 'text/plain; charset=utf-8');
+        $headers->addHeaderLine('Vary', 'Accept');
+        $headers->addHeaderLine('Access-Control-Allow-Origin', '*');
+        $response->setContent("Not acceptable. Available representations:\n" . implode("\n", $offers) . "\n");
+        return $response;
+    }
+
     protected function notFound(): Response
     {
         $response = $this->getResponse();

@@ -40,6 +40,7 @@ test('the dump is the concatenation of every resource document, gzipped', functi
         assertSameValue(hash_file('sha256', $store->dumpPath()), $state['sha256']);
         assertSameValue(7392, $state['example_resource'], 'the richest item is the example');
         assertSameValue([
+            ['authority' => 'doi', 'predicate' => 'https://schema.org/sameAs', 'triples' => 2],
             ['authority' => 'gnd', 'predicate' => 'http://www.w3.org/2002/07/owl#sameAs', 'triples' => 1],
             ['authority' => 'loc', 'predicate' => 'http://www.w3.org/2004/02/skos/core#exactMatch', 'triples' => 1],
         ], $state['linksets']);

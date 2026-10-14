@@ -122,7 +122,10 @@ final class DatasetDescription
             $add($distribution, Vocab::DCTERMS, 'license', new Iri($settings->licence));
         }
 
+        // A linkset's objectsTarget is a dataset, not a website: each authority
+        // gets one void:Dataset node, described by its homepage and URI space.
         $authorities = $this->identityLinks->authorities();
+        $targets = [];
         foreach ((array) ($state['linksets'] ?? []) as $linkset) {
             $authority = (string) ($linkset['authority'] ?? '');
             $predicate = (string) ($linkset['predicate'] ?? '');
@@ -133,12 +136,26 @@ final class DatasetDescription
             $add($dataset, Vocab::VOID, 'subset', $node);
             $add($node, Vocab::RDF, 'type', Vocab::iri(Vocab::VOID, 'Linkset'));
             $add($node, Vocab::VOID, 'subjectsTarget', $dataset);
-            $target = (string) ($authorities[$authority]['dataset'] ?? '');
-            if (Iri::isAbsolute($target)) {
-                $add($node, Vocab::VOID, 'objectsTarget', new Iri($target));
+            if (isset($authorities[$authority])) {
+                $target = $this->uris->linkTarget($authority);
+                $add($node, Vocab::VOID, 'objectsTarget', $target);
+                $targets[$authority] = $target;
             }
             $add($node, Vocab::VOID, 'linkPredicate', new Iri($predicate));
             $add($node, Vocab::VOID, 'triples', $integer((int) ($linkset['triples'] ?? 0)));
+        }
+        foreach ($targets as $authority => $target) {
+            $definition = $authorities[$authority];
+            $add($target, Vocab::RDF, 'type', Vocab::iri(Vocab::VOID, 'Dataset'));
+            if (($definition['label'] ?? '') !== '') {
+                $add($target, Vocab::DCTERMS, 'title', new Literal((string) $definition['label']));
+            }
+            if (Iri::isAbsolute((string) ($definition['dataset'] ?? ''))) {
+                $add($target, Vocab::FOAF, 'homepage', new Iri((string) $definition['dataset']));
+            }
+            if (Iri::isAbsolute((string) ($definition['uri_space'] ?? ''))) {
+                $add($target, Vocab::VOID, 'uriSpace', new Literal((string) $definition['uri_space']));
+            }
         }
 
         return $triples;

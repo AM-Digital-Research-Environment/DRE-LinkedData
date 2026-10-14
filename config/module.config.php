@@ -123,11 +123,37 @@ return [
             // Never published, even when a value is marked public: the sync's
             // reconciliation key, the data-sensitivity level and internal
             // filenames. Omeka already keeps them private; this is the second lock.
-            'excluded_terms' => ['dre:mongoId', 'dre:security', 'dre:bitstream'],
+            // bibo:content (full texts and transcripts) is excluded too: the
+            // dataset's licence covers the metadata, not the works themselves,
+            // and one thesis would otherwise weigh close to a megabyte of Turtle.
+            'excluded_terms' => ['dre:mongoId', 'dre:security', 'dre:bitstream', 'bibo:content'],
 
             // rdf:type added to every item set / media, beside any resource class.
             'item_set_classes' => ['http://purl.org/dc/dcmitype/Collection'],
             'media_classes' => ['https://schema.org/MediaObject'],
+            // rdf:type for an item that would otherwise have none: research
+            // items carry no resource class in Omeka.
+            'item_fallback_classes' => ['https://schema.org/CreativeWork'],
+
+            // Resource classes published as another class. Authority Resources
+            // (subjects, languages, genres, …) are classed fabio:AuthorityFile in
+            // Omeka, a FaBiO *document*; they are concepts. A skos:Concept also
+            // gets skos:prefLabel and skos:inScheme for each of its item sets.
+            'class_replacements' => [
+                'http://purl.org/spar/fabio/AuthorityFile' => 'http://www.w3.org/2004/02/skos/core#Concept',
+            ],
+
+            // Properties whose range is an ordered list (bibo:authorList, …). Omeka
+            // stores the members as plain values, in order; they are published as
+            // a real rdf:List with hash-IRI nodes, and each linked member also
+            // under the flat predicate named here.
+            'list_properties' => [
+                'bibo:authorList' => 'http://purl.org/dc/terms/creator',
+                'bibo:editorList' => 'http://purl.org/dc/terms/contributor',
+            ],
+
+            // Literals published as xsd:decimal when they are plain decimals.
+            'decimal_properties' => ['geo:lat', 'geo:long'],
 
             'identity_links' => [
                 // Properties whose URI values are checked against the authorities.
@@ -141,50 +167,68 @@ return [
                 ],
                 // pattern: PCRE matched against the stored URI; canonical: its
                 // replacement (the authority's own entity IRI); dataset: the
-                // target dataset in VoID linksets.
+                // target dataset's homepage and uri_space its entity IRIs, both
+                // for the VoID linksets.
                 'authorities' => [
                     'wikidata' => [
                         'label' => 'Wikidata',
                         'pattern' => '~^https?://www\.wikidata\.org/(?:entity|wiki)/(Q[1-9][0-9]*)$~',
                         'canonical' => 'http://www.wikidata.org/entity/$1',
                         'dataset' => 'https://www.wikidata.org/',
+                        'uri_space' => 'http://www.wikidata.org/entity/',
                     ],
                     'loc' => [
                         'label' => 'Library of Congress',
                         'pattern' => '~^https?://id\.loc\.gov/authorities/(subjects|names|genreForms)/([a-z]+[0-9]+)(?:\.html)?$~',
                         'canonical' => 'http://id.loc.gov/authorities/$1/$2',
                         'dataset' => 'http://id.loc.gov/',
+                        'uri_space' => 'http://id.loc.gov/authorities/',
                     ],
                     'gnd' => [
                         'label' => 'GND',
                         'pattern' => '~^https?://d-nb\.info/gnd/([0-9X-]+)$~',
                         'canonical' => 'https://d-nb.info/gnd/$1',
                         'dataset' => 'https://d-nb.info/gnd/',
+                        'uri_space' => 'https://d-nb.info/gnd/',
                     ],
                     'viaf' => [
                         'label' => 'VIAF',
                         'pattern' => '~^https?://(?:www\.)?viaf\.org/viaf/([0-9]+)/?$~',
                         'canonical' => 'http://viaf.org/viaf/$1',
                         'dataset' => 'http://viaf.org/',
+                        'uri_space' => 'http://viaf.org/viaf/',
                     ],
                     'orcid' => [
                         'label' => 'ORCID',
                         'pattern' => '~^https?://orcid\.org/([0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X])$~',
                         'canonical' => 'https://orcid.org/$1',
                         'dataset' => 'https://orcid.org/',
+                        'uri_space' => 'https://orcid.org/',
                     ],
                     'ror' => [
                         'label' => 'ROR',
                         'pattern' => '~^https?://ror\.org/(0[a-z0-9]{8})$~',
                         'canonical' => 'https://ror.org/$1',
                         'dataset' => 'https://ror.org/',
+                        'uri_space' => 'https://ror.org/',
                     ],
                     'geonames' => [
                         'label' => 'GeoNames',
                         'pattern' => '~^https?://(?:www\.|sws\.)?geonames\.org/([0-9]+)(?:/.*)?$~',
                         'canonical' => 'https://sws.geonames.org/$1/',
                         'dataset' => 'https://www.geonames.org/',
+                        'uri_space' => 'https://sws.geonames.org/',
                     ],
+                ],
+                // DOIs: the properties that hold one, stored as a bare DOI or a
+                // resolver URL. Each is published as the bare DOI literal (what
+                // bibo:doi expects) plus a link to its https://doi.org/ IRI.
+                'doi' => [
+                    'properties' => ['bibo:doi'],
+                    'label' => 'DOI',
+                    'predicate' => 'https://schema.org/sameAs',
+                    'dataset' => 'https://doi.org/',
+                    'uri_space' => 'https://doi.org/',
                 ],
             ],
         ],

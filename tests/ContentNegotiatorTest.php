@@ -27,6 +27,16 @@ test('quality ties go to the server preference', function (): void {
     assertSameValue('text/turtle', ContentNegotiator::negotiate('*/*', ['text/turtle', 'application/ld+json']));
 });
 
+test('a resource URI refuses only headers it cannot answer at all', function (): void {
+    foreach (['application/rdf+xml', 'application/rdf+xml, application/xml', 'text/turtle;q=0', 'image/png'] as $accept) {
+        assertTrue(!ContentNegotiator::acceptable($accept), $accept . ' should be a 406');
+    }
+    foreach ([null, '', 'garbage', '*/*', 'text/*', 'application/rdf+xml, text/turtle;q=0.5', 'application/rdf+xml, */*;q=0.1', 'text/html'] as $accept) {
+        assertTrue(ContentNegotiator::acceptable($accept), var_export($accept, true) . ' should be answered');
+    }
+    assertSameValue(['text/html', 'text/turtle', 'application/n-triples', 'application/ld+json'], ContentNegotiator::offers());
+});
+
 test('unsupported types are not acceptable', function (): void {
     assertSameValue(null, ContentNegotiator::negotiate('application/rdf+xml', Format::mediaTypes()));
     assertSameValue(null, ContentNegotiator::rdfFormat('application/rdf+xml'), 'falls back to the page');

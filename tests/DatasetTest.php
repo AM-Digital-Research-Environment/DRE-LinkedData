@@ -77,7 +77,13 @@ test('the VoID description carries the dump, the counts and the linksets', funct
 
     $wikidata = '<' . FIXTURE_BASE . '/linked-data/void#links-wikidata-sameAs>';
     assertContainsText($dataset . ' <' . $void . 'subset> ' . $wikidata . ' .', $nt);
-    assertContainsText($wikidata . ' <' . $void . 'objectsTarget> <https://www.wikidata.org/> .', $nt);
+    $wikidataSet = '<' . FIXTURE_BASE . '/linked-data/void#dataset-wikidata>';
+    assertContainsText($wikidata . ' <' . $void . 'objectsTarget> ' . $wikidataSet . ' .', $nt);
+    assertContainsText($wikidataSet . ' <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <' . $void . 'Dataset> .', $nt);
+    assertContainsText($wikidataSet . ' <http://purl.org/dc/terms/title> "Wikidata" .', $nt);
+    assertContainsText($wikidataSet . ' <http://xmlns.com/foaf/0.1/homepage> <https://www.wikidata.org/> .', $nt);
+    assertContainsText($wikidataSet . ' <' . $void . 'uriSpace> "http://www.wikidata.org/entity/" .', $nt);
+    assertSameValue(3, substr_count($nt, '<http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <' . $void . 'Dataset> .'), 'ours, plus one node per target dataset');
     assertContainsText($wikidata . ' <' . $void . 'linkPredicate> <http://www.w3.org/2002/07/owl#sameAs> .', $nt);
     assertContainsText($wikidata . ' <' . $void . 'triples> "260"^^<http://www.w3.org/2001/XMLSchema#integer> .', $nt);
     assertContainsText('<' . FIXTURE_BASE . '/linked-data/void#links-loc-exactMatch> <' . $void . 'linkPredicate> <http://www.w3.org/2004/02/skos/core#exactMatch> .', $nt);

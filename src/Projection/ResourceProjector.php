@@ -21,7 +21,15 @@ use DRELinkedData\Rdf\Vocab;
  *   • Literals carry their language tag, and Numeric Data Types values become
  *     xsd:gYear / gYearMonth / date / dateTime / integer / duration.
  *   • Authority identifiers also yield owl:sameAs / skos:exactMatch links
- *     ({@see IdentityLinks}).
+ *     ({@see IdentityLinks}); a DOI is published bare, as bibo:doi expects,
+ *     with a schema:sameAs link to its https://doi.org/ IRI.
+ *   • Resource classes can be replaced (fabio:AuthorityFile → skos:Concept);
+ *     a concept gets skos:prefLabel and skos:inScheme its item sets, and an
+ *     item with no class at all gets a fallback (schema:CreativeWork).
+ *   • List properties (bibo:authorList, bibo:editorList) become real rdf:Lists
+ *     on hash IRIs, in Omeka's value order, plus a flat dcterms:creator /
+ *     dcterms:contributor for each linked member.
+ *   • Coordinates are xsd:decimal.
  *   • Item-set membership is schema:isPartOf, kept apart from dcterms:isPartOf,
  *     which the sync already uses for "parent project".
  *   • Items point at their media with schema:associatedMedia; a media states
@@ -44,6 +52,18 @@ final class ResourceProjector
     /** @var array<string,string[]> kind => class IRIs */
     private readonly array $kindClasses;
 
+    /** @var string[] */
+    private readonly array $itemFallbackClasses;
+
+    /** @var array<string,string> class IRI => published class IRI */
+    private readonly array $classReplacements;
+
+    /** @var array<string,string> list property term => flat predicate IRI */
+    private readonly array $listProperties;
+
+    /** @var array<string,true> */
+    private readonly array $decimalProperties;
+
     /**
      * @param array<string,mixed> $config the 'projection' config block
      */
@@ -58,6 +78,10 @@ final class ResourceProjector
             ResourceDescription::ITEM_SET => array_values((array) ($config['item_set_classes'] ?? [])),
             ResourceDescription::MEDIA => array_values((array) ($config['media_classes'] ?? [])),
         ];
+        $this->itemFallbackClasses = array_values((array) ($config['item_fallback_classes'] ?? []));
+        $this->classReplacements = (array) ($config['class_replacements'] ?? []);
+        $this->listProperties = (array) ($config['list_properties'] ?? []);
+        $this->decimalProperties = array_fill_keys((array) ($config['decimal_properties'] ?? []), true);
     }
 
     public function describeOne(int $id): ?ResourceDescription
@@ -188,21 +212,28 @@ final class ResourceProjector
 
         /** @var array<string,Triple> $triples keyed for de-duplication, in first-seen order */
         $triples = [];
-        $add = static function (Iri $predicate, Iri|Literal $object) use (&$triples, $subject): bool {
-            $key = NTriplesSerializer::iri($predicate) . ' ' . NTriplesSerializer::term($object);
+        $addAbout = static function (Iri $about, Iri $predicate, Iri|Literal $object) use (&$triples): bool {
+            $key = NTriplesSerializer::iri($about) . ' ' . NTriplesSerializer::iri($predicate) . ' ' . NTriplesSerializer::term($object);
             if (isset($triples[$key])) {
                 return false;
             }
-            $triples[$key] = new Triple($subject, $predicate, $object);
+            $triples[$key] = new Triple($about, $predicate, $object);
             return true;
         };
+        $add = static fn (Iri $predicate, Iri|Literal $object): bool => $addAbout($subject, $predicate, $object);
         $links = [];
 
-        $type = new Iri(Vocab::RDF_TYPE);
+        $classIris = [];
         if ($row['resource_class_id'] !== null && isset($classes[(int) $row['resource_class_id']])) {
-            $add($type, new Iri($classes[(int) $row['resource_class_id']]));
+            $class = $classes[(int) $row['resource_class_id']];
+            $classIris[] = $this->classReplacements[$class] ?? $class;
         }
-        foreach ($this->kindClasses[$kind] ?? [] as $class) {
+        array_push($classIris, ...($this->kindClasses[$kind] ?? []));
+        if (!$classIris && $kind === ResourceDescription::ITEM) {
+            $classIris = $this->itemFallbackClasses;
+        }
+        $type = new Iri(Vocab::RDF_TYPE);
+        foreach ($classIris as $class) {
             $add($type, new Iri($class));
         }
 
@@ -210,19 +241,51 @@ final class ResourceProjector
         if ($title !== '') {
             $add(Vocab::iri(Vocab::RDFS, 'label'), new Literal($title));
         }
+        if (in_array(Vocab::SKOS . 'Concept', $classIris, true)) {
+            if ($title !== '') {
+                $add(Vocab::iri(Vocab::SKOS, 'prefLabel'), new Literal($title));
+            }
+            foreach ($itemSetIds as $itemSetId) {
+                $add(Vocab::iri(Vocab::SKOS, 'inScheme'), $this->uris->resource($itemSetId));
+            }
+        }
+
+        /** @var array<string,array{predicate:Iri,members:array<int,Iri|Literal>}> $lists by term, in value order */
+        $lists = [];
 
         foreach ($values as $value) {
             $property = $properties[(int) $value['property_id']] ?? null;
             if ($property === null || isset($this->excludedTerms[$property['term']])) {
                 continue;
             }
+            $term = $property['term'];
             $predicate = new Iri($property['iri']);
+
+            if (isset($this->listProperties[$term])) {
+                $member = $this->listMember($value);
+                if ($member !== null) {
+                    $lists[$term] ??= ['predicate' => $predicate, 'members' => []];
+                    $lists[$term]['members'][] = $member;
+                }
+                continue;
+            }
 
             if ($value['value_resource_id'] !== null) {
                 if ((int) $value['target_visible'] === 1) {
                     $add($predicate, $this->uris->resource((int) $value['value_resource_id']));
                 }
                 continue;
+            }
+
+            if ($this->identityLinks->holdsDoi($term)) {
+                $doi = $this->identityLinks->doi(trim((string) ($value['uri'] ?? '')) ?: (string) ($value['value'] ?? ''));
+                if ($doi !== null) {
+                    $add($predicate, new Literal($doi['doi']));
+                    if ($add(new Iri($doi['predicate']), new Iri($doi['iri']))) {
+                        $links[] = ['authority' => $doi['authority'], 'predicate' => $doi['predicate']];
+                    }
+                    continue;
+                }
             }
 
             $uri = trim((string) ($value['uri'] ?? ''));
@@ -232,7 +295,7 @@ final class ResourceProjector
                     continue;
                 }
                 $add($predicate, new Iri($uri));
-                $link = $this->identityLinks->appliesTo($property['term'])
+                $link = $this->identityLinks->appliesTo($term)
                     ? $this->identityLinks->match($uri, $templateId)
                     : null;
                 if ($link !== null && $add(new Iri($link['predicate']), new Iri($link['iri']))) {
@@ -241,9 +304,28 @@ final class ResourceProjector
                 continue;
             }
 
-            $literal = self::literal((string) $value['type'], (string) ($value['value'] ?? ''), $value['lang'] ?? null);
+            $literal = isset($this->decimalProperties[$term])
+                ? self::decimal((string) $value['type'], (string) ($value['value'] ?? ''))
+                : null;
+            $literal ??= self::literal((string) $value['type'], (string) ($value['value'] ?? ''), $value['lang'] ?? null);
             if ($literal !== null) {
                 $add($predicate, $literal);
+            }
+        }
+
+        // Each list hangs off hash IRIs of the resource ({id}#authorList-1, -2, …),
+        // so the document that describes the resource also describes its lists.
+        foreach ($lists as $term => $list) {
+            $local = (string) preg_replace('~^.*[:/#]~', '', $term);
+            $node = static fn (int $position): Iri => new Iri($subject->value . '#' . $local . '-' . $position);
+            $add($list['predicate'], $node(1));
+            $count = count($list['members']);
+            foreach ($list['members'] as $index => $member) {
+                $addAbout($node($index + 1), new Iri(Vocab::RDF . 'first'), $member);
+                $addAbout($node($index + 1), new Iri(Vocab::RDF . 'rest'), $index + 1 < $count ? $node($index + 2) : new Iri(Vocab::RDF . 'nil'));
+                if ($member instanceof Iri) {
+                    $add(new Iri($this->listProperties[$term]), $member);
+                }
             }
         }
 
@@ -277,6 +359,34 @@ final class ResourceProjector
             array_values($triples),
             $links
         );
+    }
+
+    /**
+     * One member of a list property: the linked resource when it is visible,
+     * the URI or the literal otherwise; null for a hidden link or a blank value.
+     *
+     * @param array<string,mixed> $value
+     */
+    private function listMember(array $value): Iri|Literal|null
+    {
+        if ($value['value_resource_id'] !== null) {
+            return (int) $value['target_visible'] === 1 ? $this->uris->resource((int) $value['value_resource_id']) : null;
+        }
+        $uri = trim((string) ($value['uri'] ?? ''));
+        if ($uri !== '' && Iri::isAbsolute($uri)) {
+            return new Iri($uri);
+        }
+        return self::literal((string) $value['type'], $uri !== '' ? $uri : (string) ($value['value'] ?? ''), $value['lang'] ?? null);
+    }
+
+    /** A plain decimal (`49.92885`, `-19`, `48.0`) as xsd:decimal; null for anything else. */
+    public static function decimal(string $type, string $text): ?Literal
+    {
+        $trimmed = trim($text);
+        if ($type !== 'literal' || !preg_match('~^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$~', $trimmed)) {
+            return null;
+        }
+        return new Literal($trimmed, null, Vocab::XSD . 'decimal');
     }
 
     /**
