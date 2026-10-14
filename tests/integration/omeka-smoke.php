@@ -352,6 +352,11 @@ try {
     $rdf = $dispatch(ResourceController::class, '/resource/7', 'application/ld+json');
     smokeAssert($rdf->getStatusCode() === 303 && $header($rdf, 'Location') === $base . '/resource/7.jsonld', 'RDF clients must be sent to the document.');
     smokeAssert(str_contains($header($rdf, 'Vary'), 'Accept'), 'The 303 must vary by Accept.');
+    $rdfXml = $dispatch(ResourceController::class, '/resource/7', 'application/rdf+xml');
+    smokeAssert($rdfXml->getStatusCode() === 406, 'A format the module does not serve must be a 406, got ' . $rdfXml->getStatusCode());
+    smokeAssert(str_contains($rdfXml->getContent(), 'text/turtle'), 'The 406 must list the available types.');
+    $missing = $dispatch(ResourceController::class, '/resource/424242', 'application/rdf+xml');
+    smokeAssert($missing->getStatusCode() === 404, 'A missing resource is a 404 before any negotiation.');
 
     $turtle = $dispatch(ResourceController::class, '/resource/7.ttl');
     smokeAssert($turtle->getStatusCode() === 200, 'The Turtle document failed.');

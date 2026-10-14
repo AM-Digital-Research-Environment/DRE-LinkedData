@@ -43,13 +43,37 @@ test('every authority pattern compiles and names its target dataset', function (
     foreach (moduleConfig()['projection']['identity_links']['authorities'] as $name => $authority) {
         assertTrue(@preg_match($authority['pattern'], '') !== false, $name . ' pattern must compile');
         assertTrue(str_starts_with($authority['dataset'], 'http'), $name . ' needs a dataset IRI for its VoID linkset');
+        assertTrue(str_starts_with($authority['uri_space'] ?? '', 'http'), $name . ' needs a URI space for its VoID target');
         assertTrue(($authority['label'] ?? '') !== '', $name . ' needs a label');
     }
+    $links = new IdentityLinks(moduleConfig()['projection']['identity_links']);
+    assertSameValue('DOI', $links->authorities()['doi']['label'] ?? null, 'DOIs are a link target too');
 });
 
-test('private sync and access-control terms are on the exclusion list', function (): void {
+test('DOIs are recognised in every stored shape and nothing else', function (): void {
+    $links = new IdentityLinks(moduleConfig()['projection']['identity_links']);
+    foreach ([
+        '10.1017/S0021853721000372',
+        'doi:10.1017/S0021853721000372',
+        'https://doi.org/10.1017/S0021853721000372',
+        'http://dx.doi.org/10.1017/S0021853721000372',
+        ' HTTPS://DOI.ORG/10.1017/S0021853721000372 ',
+    ] as $stored) {
+        $doi = $links->doi($stored);
+        assertSameValue('10.1017/S0021853721000372', $doi['doi'] ?? null, $stored);
+        assertSameValue('https://doi.org/10.1017/S0021853721000372', $doi['iri'] ?? null, $stored);
+        assertSameValue('https://schema.org/sameAs', $doi['predicate'] ?? null, $stored);
+    }
+    foreach (['', 'eref-67371', '10.1017', 'https://example.org/10.1017/S0021853721000372'] as $notDoi) {
+        assertSameValue(null, $links->doi($notDoi), $notDoi);
+    }
+    assertTrue($links->holdsDoi('bibo:doi'));
+    assertTrue(!$links->holdsDoi('dcterms:identifier'));
+});
+
+test('private sync and access-control terms, and full texts, are on the exclusion list', function (): void {
     $excluded = moduleConfig()['projection']['excluded_terms'];
-    foreach (['dre:mongoId', 'dre:security', 'dre:bitstream'] as $term) {
+    foreach (['dre:mongoId', 'dre:security', 'dre:bitstream', 'bibo:content'] as $term) {
         assertTrue(in_array($term, $excluded, true), $term);
     }
 });

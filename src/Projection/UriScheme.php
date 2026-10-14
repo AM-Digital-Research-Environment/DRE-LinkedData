@@ -69,6 +69,12 @@ final class UriScheme
         return new Iri($this->voidDocument() . '#links-' . rawurlencode($authority) . '-' . rawurlencode($local));
     }
 
+    /** The node standing for another dataset our linksets point into. */
+    public function linkTarget(string $authority): Iri
+    {
+        return new Iri($this->voidDocument() . '#dataset-' . rawurlencode($authority));
+    }
+
     public function dump(): string
     {
         return $this->base . '/linked-data/dump.nt.gz';

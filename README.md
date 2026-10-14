@@ -46,7 +46,9 @@ https://data.africamultiple.uni-bayreuth.de/resource/7392.jsonld   JSON-LD
 It content-negotiates on `Accept`:
 
 - a browser is redirected to `/s/amira/item/7392`;
-- an RDF client is redirected to the document in the format it named.
+- an RDF client is redirected to the document in the format it named;
+- a client that accepts none of these (only `application/rdf+xml`, say) gets
+  `406 Not Acceptable` with the list of available types, not a page it cannot read.
 
 The same works from the record page itself:
 
@@ -72,14 +74,23 @@ Each document describes one resource, plus a few statements about the document i
 | Wikidata / GND / LCSH identifiers | `dcterms:identifier` only | also `owl:sameAs` / `skos:exactMatch` |
 | Item-set membership | `o:item_set` | `schema:isPartOf` |
 | Media | `o:media` | `schema:associatedMedia`; the media states `schema:contentUrl`, `schema:encodingFormat` and the work it encodes |
+| Authority Resources | `fabio:AuthorityFile` | `skos:Concept`, with `skos:prefLabel` and `skos:inScheme` (its item sets) |
+| Items with no class | no `rdf:type` | `schema:CreativeWork` |
+| `bibo:authorList`, `bibo:editorList` | one value per person | an `rdf:List` in Omeka's order, on hash IRIs (`/resource/{id}#authorList-1`, …), plus `dcterms:creator` / `dcterms:contributor` for each linked person |
+| DOIs | `bibo:doi` holding a `https://doi.org/` URL | the bare DOI in `bibo:doi`, plus `schema:sameAs` its `https://doi.org/` IRI |
+| Full text and transcripts (`bibo:content`) | included | dropped |
 
 **Values.** Language tags are kept when they are well-formed. Numeric Data Types values
 are typed at their stored precision: `xsd:gYear`, `gYearMonth`, `date`, `dateTime`,
-`integer` or `duration`.
+`integer` or `duration`. `geo:lat` and `geo:long` are `xsd:decimal` when they are numbers.
 
 **Visibility.** A resource is published when it is public, and a media only when its item
 is public too. Values must be public themselves. A link to a resource that is not visible is
 dropped entirely rather than turned into a literal, so not even a private item's id leaks.
+
+**Full texts.** `bibo:content` (publication full texts, podcast and video transcripts) is
+not projected. The licence on the documents and the dump covers the metadata, which is not
+true of the works themselves, and one thesis would otherwise make an 880 KB document.
 
 **Belt and braces.** `dre:mongoId`, `dre:security` and `dre:bitstream` are never published,
 even when a value is marked public by mistake. An uploaded file's original name and a
@@ -102,8 +113,11 @@ concepts, so they get `skos:exactMatch`. Other identifiers stored on authority i
 as YouTube playlist and GEPRIS URLs, stay plain identifiers: they are related, not the same
 thing.
 
+DOIs are handled apart from these identity links: `bibo:doi` takes a bare DOI, so a stored
+`https://doi.org/…`, `http://dx.doi.org/…` or `doi:…` value is published as the DOI itself,
+with `schema:sameAs` to its resolver IRI. Those links form a VoID linkset of their own.
+
 Value annotations (such as a contributor's affiliation for one item) are not projected yet.
-Research items have no resource class in Omeka, so they get no `rdf:type`.
 
 ## The dump
 
@@ -139,7 +153,9 @@ tdb2.tdbloader --loc /fuseki/databases/amira amira-linked-data.nt.gz
 - **Figures from the last dump.** `void:triples`, `void:entities` and the vocabularies used.
 - **Distribution.** A `dcat:Distribution` for the dump, with media type, compression and
   byte size.
-- **Linksets.** One `void:Linkset` per authority and predicate, with its link count.
+- **Linksets.** One `void:Linkset` per authority and predicate, with its link count. Its
+  `void:objectsTarget` is a `void:Dataset` node for the authority (`#dataset-wikidata`, …)
+  with a title, a homepage and the authority's `void:uriSpace`.
 
 ## The page block
 
@@ -192,7 +208,8 @@ production runtime, 8.5.
 | Metadata licence | A licence URI (e.g. `https://creativecommons.org/publicdomain/zero/1.0/`), stated on every document and the dump. **Nothing is claimed while this is empty.** |
 | Generate the dump now | Starts the dump job on save. |
 
-Structural choices — excluded terms, authority patterns, which template is "concepts", the
+Structural choices — excluded terms, authority patterns and DOI properties, which template
+is "concepts", class replacements and the fallback class, list and decimal properties, the
 classes added to item sets and media, the batch size — are in the `dre_linked_data` block of
 `config/module.config.php`, overridable key by key from Omeka's `config/local.config.php`.
 
@@ -235,7 +252,8 @@ graph.
 - **SPARQL.** Load the dump into Apache Jena Fuseki and expose a read-only endpoint, then
   advertise it with `void:sparqlEndpoint`.
 - **Value annotations**, as RDF 1.2 triple terms once Fuseki and the serialisers agree.
-- **Classes for research items**, perhaps from their Type of Resource authority.
+- **Finer classes for research items**, perhaps from their Type of Resource authority,
+  instead of the `schema:CreativeWork` fallback.
 - **A dereferenceable `dre:` namespace.** `http://am-digital.org/ontology/dre/` does not
   resolve today.
 - **Wider authority coverage** in the source data (Type of Resource → DCMI Type, languages →

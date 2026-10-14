@@ -46,7 +46,11 @@ class ResourceController extends AbstractRdfController
 
         $extension = $this->params()->fromRoute('format');
         if ($extension === null || $extension === '') {
-            $format = ContentNegotiator::rdfFormat($this->accept());
+            $accept = $this->accept();
+            if (!ContentNegotiator::acceptable($accept)) {
+                return $this->notAcceptable(ContentNegotiator::offers());
+            }
+            $format = ContentNegotiator::rdfFormat($accept);
             $slug = $this->site->slug();
             if ($format === null && $slug !== null) {
                 return $this->seeOther($this->url()->fromRoute('site/resource-id', [

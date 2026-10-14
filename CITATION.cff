@@ -24,8 +24,8 @@ authors:
 repository-code: "https://github.com/AM-Digital-Research-Environment/DRE-LinkedData"
 url: "https://github.com/AM-Digital-Research-Environment/DRE-LinkedData"
 license: GPL-3.0-or-later
-version: 0.1.0
-date-released: "2026-10-12"
+version: 0.2.0
+date-released: "2026-10-14"
 keywords:
   - Omeka S
   - Linked Open Data
