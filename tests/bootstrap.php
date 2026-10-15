@@ -17,6 +17,11 @@ namespace Doctrine\DBAL {
             {
                 throw new \LogicException('Unit tests use FakeSource; the connection is never queried.');
             }
+
+            public function quote($value): string
+            {
+                return "'" . str_replace("'", "''", (string) $value) . "'";
+            }
         }
     }
 }
@@ -183,6 +188,45 @@ namespace {
         public function vocabularies(): array
         {
             return $this->vocabularyRows;
+        }
+
+        public function itemSetsWithMembersOfClass(array $itemSetIds, array $classIris): array
+        {
+            $classIds = array_keys(array_filter($this->classMap, static fn (string $iri): bool => in_array($iri, $classIris, true)));
+            $classOf = [];
+            foreach ($this->resourceRows as $row) {
+                $classOf[(int) $row['id']] = $row['resource_class_id'];
+            }
+            $sets = [];
+            foreach ($this->memberships as $membership) {
+                $setId = (int) $membership['item_set_id'];
+                if (in_array($setId, $itemSetIds, true) && in_array($classOf[(int) $membership['item_id']] ?? null, $classIds, true)) {
+                    $sets[$setId] = true;
+                }
+            }
+            ksort($sets);
+            return array_keys($sets);
+        }
+
+        /** @var array<int,array{0:int,1:string[]}> every termValues() request */
+        public array $termRequests = [];
+
+        public function termValues(int $id, array $terms): array
+        {
+            $this->termRequests[] = [$id, $terms];
+            $rows = [];
+            foreach ($this->valueRows as $row) {
+                $term = $this->propertyMap[(int) $row['property_id']]['term'] ?? null;
+                if ((int) $row['resource_id'] === $id && $row['value_resource_id'] === null && in_array($term, $terms, true)) {
+                    $rows[] = ['term' => $term, 'value' => $row['value'], 'uri' => $row['uri']];
+                }
+            }
+            return $rows;
+        }
+
+        public function isVisible(int $id): bool
+        {
+            return $this->resources([$id]) !== [];
         }
     }
 

@@ -12,7 +12,9 @@ const FIXTURE_BASE = 'https://data.example.org';
  * A slice of AMIRA as the source queries return it: a research item with the
  * awkward values the sync really writes, a subject reconciled to LCSH (plus a
  * YouTube playlist that is NOT an identity), a person with a GND id, a project
- * item set, an uploaded scan and a YouTube media.
+ * item set, the subjects item set, an uploaded scan and a YouTube media, an
+ * item whose only title is private, and one whose template names another
+ * title property.
  *
  * Absent on purpose, because SQL filters them before PHP sees them: private
  * resources, private values. A link to a private resource is present with
@@ -56,12 +58,15 @@ function amiraSource(): FakeSource
         41 => 'http://xmlns.com/foaf/0.1/Project',
     ];
 
-    $resource = static fn (int $id, string $type, string $title, ?int $template, ?int $class, ?string $modified = '2026-06-09 05:37:09'): array => [
+    // 'title' is Omeka's resource.title column. The real query no longer
+    // selects it; it is kept here to prove the projection never reads it.
+    $resource = static fn (int $id, string $type, string $title, ?int $template, ?int $class, ?string $modified = '2026-06-09 05:37:09', ?int $titleProperty = null): array => [
         'id' => $id,
         'resource_type' => $type,
         'title' => $title,
         'resource_class_id' => $class,
         'resource_template_id' => $template,
+        'title_property_id' => $titleProperty,
         'created' => '2026-03-26 10:11:06',
         'modified' => $modified,
     ];
@@ -69,9 +74,14 @@ function amiraSource(): FakeSource
         $resource(149, OmekaSource::ITEM, 'Ulli Beier', 4, 40),
         $resource(2390, OmekaSource::ITEM, 'Yoruba (African people)', 6, 5),
         $resource(6259, OmekaSource::ITEM_SET, 'Beier estate', null, null),
+        $resource(6260, OmekaSource::ITEM_SET, 'Subjects', null, null),
         $resource(7392, OmekaSource::ITEM, 'Volume 8: Yoruba Architecture and Wall Painting', 10, null),
         $resource(8001, OmekaSource::MEDIA, 'Scan', null, null, null),
         $resource(8002, OmekaSource::MEDIA, 'Interview', null, null, null),
+        // Omeka copied the private working title into resource.title.
+        $resource(7400, OmekaSource::ITEM, 'Secret working title', 10, null),
+        // The template's title property is fabio:hasTranslatedTitle.
+        $resource(7401, OmekaSource::ITEM, 'Generic title', 11, null, '2026-06-09 05:37:09', 346),
     ];
 
     $value = static fn (int $resource, int $property, string $type, ?string $text, ?string $uri = null, ?int $link = null, int $visible = 0, ?string $lang = null): array => [
@@ -95,6 +105,17 @@ function amiraSource(): FakeSource
         $value(2390, 10, 'uri', null, 'https://www.youtube.com/playlist?list=PLDlHB4qY36WjCq9RIsxLzeckaPB7nQxz9'),
 
         $value(6259, 1, 'literal', 'Beier estate'),
+        $value(6260, 1, 'literal', 'Subjects'),
+
+        // 7400's only title value is private, so the query does not return it.
+        $value(7400, 7, 'numeric:timestamp', '2021-02-31'),
+        $value(7400, 7, 'numeric:timestamp', '2024-02-29'),
+        $value(7400, 7, 'numeric:timestamp', '2023-02-29T10:00'),
+        $value(7400, 7, 'numeric:interval', '1975-03/1980'),
+
+        $value(7401, 1, 'literal', 'Generic title'),
+        $value(7401, 346, 'literal', '   '),
+        $value(7401, 346, 'literal', 'Template title'),
 
         $value(7392, 1, 'literal', 'Volume 8: Yoruba Architecture and Wall Painting'),
         $value(7392, 346, 'literal', 'Volume 8: Yoruba Architecture (translated)', null, null, 0, 'en'),
@@ -147,8 +168,14 @@ function amiraProjector(?FakeSource $source = null): ResourceProjector
     $config = moduleConfig()['projection'];
     return new ResourceProjector(
         $source ?? amiraSource(),
-        new UriScheme(FIXTURE_BASE),
+        fixtureUris(),
         new IdentityLinks($config['identity_links']),
         $config
     );
+}
+
+/** The fixture URI scheme, with `amira` as the default site. */
+function fixtureUris(): UriScheme
+{
+    return new UriScheme(FIXTURE_BASE, static fn (): ?string => 'amira');
 }

@@ -40,6 +40,9 @@ class OmekaSource
     /** @var array<int,true> class ids already looked up, found or not */
     private array $classesSeen = [];
 
+    /** @var array<string,int[]> class IRI list => class ids */
+    private array $classIdsByIris = [];
+
     public function __construct(private readonly Connection $connection)
     {
     }
@@ -55,13 +58,25 @@ class OmekaSource
         if (!$ids) {
             return [];
         }
+        // Not resource.title: Omeka fills that column from the first title
+        // value whether or not the value is public. The label is built from
+        // the public values instead, so the template's title property is
+        // what is needed here.
         return $this->connection->fetchAllAssociative(
-            'SELECT r.id, r.resource_type, r.title, r.resource_class_id, r.resource_template_id, r.created, r.modified
+            'SELECT r.id, r.resource_type, r.resource_class_id, r.resource_template_id, rt.title_property_id,
+                    r.created, r.modified
              FROM resource r
+             LEFT JOIN resource_template rt ON rt.id = r.resource_template_id
              WHERE r.id IN (' . self::idList($ids) . ') AND ' . self::visible('r') . '
              ORDER BY r.id',
             self::TYPE_PARAMS
         );
+    }
+
+    /** Whether a resource is visible to an anonymous reader. */
+    public function isVisible(int $id): bool
+    {
+        return $id > 0 && $this->resources([$id]) !== [];
     }
 
     /**
@@ -215,12 +230,141 @@ class OmekaSource
         return array_intersect_key($this->classes, array_flip(array_map('intval', $ids)));
     }
 
+    /**
+     * The item sets among $itemSetIds that have a public member of one of the
+     * given resource classes: the item sets that concepts point at with
+     * skos:inScheme.
+     *
+     * @param int[] $itemSetIds
+     * @param string[] $classIris
+     * @return int[]
+     */
+    public function itemSetsWithMembersOfClass(array $itemSetIds, array $classIris): array
+    {
+        if (!$itemSetIds) {
+            return [];
+        }
+        $classIds = $this->classIdsFor($classIris);
+        if (!$classIds) {
+            return [];
+        }
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT DISTINCT iis.item_set_id
+             FROM item_item_set iis
+             JOIN resource i ON i.id = iis.item_id
+             WHERE iis.item_set_id IN (' . self::idList($itemSetIds) . ')
+               AND i.is_public = 1 AND i.resource_class_id IN (' . self::idList($classIds) . ')
+             ORDER BY iis.item_set_id'
+        );
+        return array_map(static fn (array $row): int => (int) $row['item_set_id'], $rows);
+    }
+
+    /**
+     * Public literal and URI values of one resource for the given terms
+     * (`dcterms:identifier`, `bibo:doi`), in Omeka's order: one query for the
+     * identity links the view helper reports.
+     *
+     * @param string[] $terms prefixed terms
+     * @return array<int,array{term:string,value:?string,uri:?string}>
+     */
+    public function termValues(int $id, array $terms): array
+    {
+        $conditions = [];
+        foreach ($terms as $term) {
+            [$prefix, $local] = array_pad(explode(':', (string) $term, 2), 2, '');
+            if ($prefix !== '' && $local !== '') {
+                $conditions[] = '(voc.prefix = ' . $this->connection->quote($prefix)
+                    . ' AND p.local_name = ' . $this->connection->quote($local) . ')';
+            }
+        }
+        if ($id <= 0 || !$conditions) {
+            return [];
+        }
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT voc.prefix, p.local_name, v.value, v.uri
+             FROM value v
+             JOIN property p ON p.id = v.property_id
+             JOIN vocabulary voc ON voc.id = p.vocabulary_id
+             WHERE v.resource_id = ' . $id . ' AND v.is_public = 1 AND v.value_resource_id IS NULL
+               AND (' . implode(' OR ', $conditions) . ')
+             ORDER BY v.id'
+        );
+        return array_map(static fn (array $row): array => [
+            'term' => $row['prefix'] . ':' . $row['local_name'],
+            'value' => $row['value'],
+            'uri' => $row['uri'],
+        ], $rows);
+    }
+
+    /**
+     * Public site pages that contain a block of the given layout, the pages
+     * of the preferred site first.
+     *
+     * @return array<int,array{site_id:int,site_slug:string,page_slug:string}>
+     */
+    public function pagesWithBlock(string $layout, ?int $preferredSiteId = null): array
+    {
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT DISTINCT s.id AS site_id, s.slug AS site_slug, p.slug AS page_slug, p.id AS page_id
+             FROM site_page_block b
+             JOIN site_page p ON p.id = b.page_id
+             JOIN site s ON s.id = p.site_id
+             WHERE b.layout = ' . $this->connection->quote($layout) . ' AND p.is_public = 1 AND s.is_public = 1
+             ORDER BY s.id, p.id'
+        );
+        $pages = array_map(static fn (array $row): array => [
+            'site_id' => (int) $row['site_id'],
+            'site_slug' => (string) $row['site_slug'],
+            'page_slug' => (string) $row['page_slug'],
+        ], $rows);
+        if ($preferredSiteId !== null) {
+            // usort is stable: within each group the SQL order stands.
+            usort($pages, static fn (array $a, array $b): int => ($b['site_id'] === $preferredSiteId) <=> ($a['site_id'] === $preferredSiteId));
+        }
+        return $pages;
+    }
+
     /** @return array<int,array{prefix:string,namespace_uri:string}> */
     public function vocabularies(): array
     {
         return $this->connection->fetchAllAssociative(
             'SELECT prefix, namespace_uri FROM vocabulary ORDER BY id'
         );
+    }
+
+    /**
+     * Ids of the resource classes with the given IRIs, looked up once.
+     *
+     * @param string[] $iris
+     * @return int[]
+     */
+    private function classIdsFor(array $iris): array
+    {
+        $iris = array_values(array_unique(array_filter(array_map('strval', $iris))));
+        if (!$iris) {
+            return [];
+        }
+        $key = implode(' ', $iris);
+        if (isset($this->classIdsByIris[$key])) {
+            return $this->classIdsByIris[$key];
+        }
+        $locals = array_unique(array_map(
+            fn (string $iri): string => $this->connection->quote((string) preg_replace('~^.*[/#]~', '', $iri)),
+            $iris
+        ));
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT c.id, c.local_name, v.namespace_uri
+             FROM resource_class c JOIN vocabulary v ON v.id = c.vocabulary_id
+             WHERE c.local_name IN (' . implode(',', $locals) . ')'
+        );
+        $ids = [];
+        foreach ($rows as $row) {
+            if (in_array($row['namespace_uri'] . $row['local_name'], $iris, true)) {
+                $ids[] = (int) $row['id'];
+            }
+        }
+        sort($ids);
+        return $this->classIdsByIris[$key] = $ids;
     }
 
     /**

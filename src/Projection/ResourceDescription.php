@@ -31,7 +31,12 @@ final class ResourceDescription
     /** The site route controller segment for this kind (`/s/{slug}/{controller}/{id}`). */
     public function siteController(): string
     {
-        return match ($this->kind) {
+        return self::siteControllerFor($this->kind);
+    }
+
+    public static function siteControllerFor(string $kind): string
+    {
+        return match ($kind) {
             self::ITEM_SET => 'item-set',
             self::MEDIA => 'media',
             default => 'item',
