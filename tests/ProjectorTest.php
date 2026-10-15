@@ -1,7 +1,10 @@
 <?php
 declare(strict_types=1);
 
+use DRELinkedData\Projection\IdentityLinks;
 use DRELinkedData\Projection\ResourceDescription;
+use DRELinkedData\Projection\ResourceProjector;
+use DRELinkedData\Projection\UriScheme;
 use DRELinkedData\Rdf\Format;
 use DRELinkedData\Rdf\Serializer\NTriplesSerializer;
 
@@ -162,7 +165,8 @@ test('authority identifiers become identity links, by template', function (): vo
     $subject = projectedLines(2390);
     assertContainsText(R . '2390> <http://www.w3.org/2004/02/skos/core#exactMatch> <http://id.loc.gov/authorities/subjects/sh85149367> .', $subject);
     assertNotContainsText('sameAs', $subject, 'an authority concept is matched, not identical');
-    assertContainsText('<http://purl.org/dc/terms/identifier> <https://www.youtube.com/playlist?list=PLDlHB4qY36WjCq9RIsxLzeckaPB7nQxz9> .', $subject);
+    assertContainsText('<http://purl.org/dc/terms/identifier> "https://www.youtube.com/playlist?list=PLDlHB4qY36WjCq9RIsxLzeckaPB7nQxz9" .', $subject);
+    assertContainsText(R . '2390> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <https://www.youtube.com/playlist?list=PLDlHB4qY36WjCq9RIsxLzeckaPB7nQxz9> .', $subject, 'a URI that is no identity stays a link');
     assertSameValue(1, substr_count($subject, 'exactMatch'), 'the YouTube playlist is an identifier, not an identity');
 });
 
@@ -209,4 +213,69 @@ test('a resource document states what it describes, when, and under what licence
 
     $unlicensed = (new NTriplesSerializer())->serialize($projector->document($projector->describeOne(7392), Format::Turtle));
     assertNotContainsText('license', $unlicensed, 'no licence is claimed when none is configured');
+});
+
+test('dcterms:identifier holds literals; the link lives in the identity predicate', function (): void {
+    $nt = projectedLines(149);
+    $identifier = '<http://purl.org/dc/terms/identifier>';
+    assertContainsText(R . '149> ' . $identifier . ' "https://d-nb.info/gnd/124120881" .', $nt, 'the URI, as a string');
+    assertContainsText(R . '149> ' . $identifier . ' "GND 124120881" .', $nt, 'and its label, which is not lost');
+    assertNotContainsText($identifier . ' <', $nt, 'dcterms:identifier never holds an IRI (its range is rdfs:Literal)');
+    assertContainsText(R . '149> <http://www.w3.org/2002/07/owl#sameAs> <https://d-nb.info/gnd/124120881> .', $nt);
+    assertNotContainsText('seeAlso', $nt, 'an identity needs no seeAlso');
+    assertNotContainsText($identifier . ' <', projectedLines(7392));
+    assertNotContainsText($identifier . ' <', projectedLines(2390));
+});
+
+test('the label comes from public values only, never from Omeka\'s title column', function (): void {
+    $nt = projectedLines(7400);
+    assertNotContainsText('Secret working title', $nt, 'resource.title holds the private title value');
+    assertNotContainsText('rdf-schema#label', $nt, 'no public title, no label');
+    assertNotContainsText('prefLabel', $nt);
+});
+
+test('the label follows the template\'s title property, skipping blank values', function (): void {
+    $nt = projectedLines(7401);
+    assertContainsText(R . '7401> <http://www.w3.org/2000/01/rdf-schema#label> "Template title" .', $nt);
+    assertNotContainsText('rdf-schema#label> "Generic title"', $nt);
+    assertContainsText('<http://purl.org/dc/terms/title> "Generic title" .', $nt, 'dcterms:title itself is still published');
+});
+
+test('every resource is the primary topic of its record page, dated', function (): void {
+    $foaf = '<http://xmlns.com/foaf/0.1/isPrimaryTopicOf>';
+    $page = static fn (string $path): string => '<' . FIXTURE_BASE . '/s/amira/' . $path . '>';
+    assertContainsText(R . '7392> ' . $foaf . ' ' . $page('item/7392') . ' .', projectedLines(7392));
+    assertContainsText(R . '6259> ' . $foaf . ' ' . $page('item-set/6259') . ' .', projectedLines(6259));
+    assertContainsText(R . '8001> ' . $foaf . ' ' . $page('media/8001') . ' .', projectedLines(8001));
+    assertContainsText($page('item/7392') . ' <http://purl.org/dc/terms/modified> "2026-06-09T05:37:09Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .', projectedLines(7392));
+    assertContainsText($page('media/8001') . ' <http://purl.org/dc/terms/modified> "2026-03-26T10:11:06Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .', projectedLines(8001), 'never modified: the creation date');
+
+    $config = moduleConfig()['projection'];
+    $siteless = new ResourceProjector(amiraSource(), new UriScheme(FIXTURE_BASE), new IdentityLinks($config['identity_links']), $config);
+    $nt = (new NTriplesSerializer())->serialize($siteless->describeOne(7392)->triples);
+    assertNotContainsText('isPrimaryTopicOf', $nt, 'no site, no page');
+});
+
+test('an item set that holds concepts is a SKOS concept scheme', function (): void {
+    $type = '<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>';
+    assertContainsText(R . '6260> ' . $type . ' <http://www.w3.org/2004/02/skos/core#ConceptScheme> .', projectedLines(6260));
+    assertContainsText(R . '6260> ' . $type . ' <http://purl.org/dc/dcmitype/Collection> .', projectedLines(6260));
+    assertNotContainsText('ConceptScheme', projectedLines(6259), 'a collection of research items is not a scheme');
+});
+
+test('impossible calendar dates are not typed; leap days are', function (): void {
+    $nt = projectedLines(7400);
+    $xsd = 'http://www.w3.org/2001/XMLSchema#';
+    assertContainsText('<http://purl.org/dc/terms/created> "2021-02-31" .', $nt);
+    assertContainsText('"2024-02-29"^^<' . $xsd . 'date>', $nt);
+    assertContainsText('<http://purl.org/dc/terms/created> "2023-02-29T10:00" .', $nt);
+    assertSameValue(null, ResourceProjector::literal('numeric:timestamp', '2021-04-31')->datatype);
+    assertSameValue($xsd . 'date', ResourceProjector::literal('numeric:timestamp', '2000-02-29')->datatype);
+    assertSameValue(null, ResourceProjector::literal('numeric:timestamp', '1900-02-29')->datatype);
+});
+
+test('numeric intervals are plain literals', function (): void {
+    assertContainsText('<http://purl.org/dc/terms/created> "1975-03/1980" .', projectedLines(7400));
+    $literal = ResourceProjector::literal('numeric:interval', ' 1975-03-12/1980 ', 'en');
+    assertSameValue(['1975-03-12/1980', null, null], [$literal->value, $literal->language, $literal->datatype]);
 });

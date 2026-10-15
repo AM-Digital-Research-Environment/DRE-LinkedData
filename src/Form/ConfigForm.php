@@ -77,6 +77,16 @@ class ConfigForm extends Form implements InputFilterProviderInterface
         ]);
 
         $this->add([
+            'name' => DatasetSettings::CONTACT_EMAIL,
+            'type' => Element\Email::class,
+            'options' => [
+                'label' => 'Contact email', // @translate
+                'info' => 'Optional. Published as the dataset’s contact point (dcat:contactPoint) in the VoID/DCAT description. Nothing is published while this is empty.', // @translate
+            ],
+            'attributes' => ['id' => DatasetSettings::CONTACT_EMAIL],
+        ]);
+
+        $this->add([
             'name' => DatasetSettings::LICENCE,
             'type' => Element\Url::class,
             'options' => [
@@ -91,7 +101,7 @@ class ConfigForm extends Form implements InputFilterProviderInterface
             'type' => Element\Checkbox::class,
             'options' => [
                 'label' => 'Generate the dump now', // @translate
-                'info' => 'Starts a background job that rewrites the N-Triples dump and the figures in the dataset description. Run it after a sync: individual resource documents are always live, the dump is not.', // @translate
+                'info' => 'Starts a background job that rewrites the N-Triples dump and the figures in the dataset description. Run it after a sync (or schedule scripts/generate-dump.php): individual resource documents are always live, the dump is not.', // @translate
             ],
             'attributes' => ['id' => self::REGENERATE],
         ]);
@@ -130,6 +140,18 @@ class ConfigForm extends Form implements InputFilterProviderInterface
             DatasetSettings::PUBLISHER_NAME => $text(DatasetSettings::PUBLISHER_NAME),
             DatasetSettings::PUBLISHER_URI => $uri(DatasetSettings::PUBLISHER_URI),
             DatasetSettings::LICENCE => $uri(DatasetSettings::LICENCE),
+            DatasetSettings::CONTACT_EMAIL => [
+                'name' => DatasetSettings::CONTACT_EMAIL,
+                'required' => false,
+                'filters' => [['name' => StringTrim::class]],
+                'validators' => [[
+                    'name' => Regex::class,
+                    'options' => [
+                        'pattern' => '~^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$~',
+                        'messages' => [Regex::NOT_MATCH => 'Enter an email address.'], // @translate
+                    ],
+                ]],
+            ],
             self::REGENERATE => ['name' => self::REGENERATE, 'required' => false],
         ];
     }

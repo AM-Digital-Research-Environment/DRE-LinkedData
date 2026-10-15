@@ -15,10 +15,14 @@ namespace DRELinkedData\Dump;
  *   files/dre-linked-data/.dump-*.part      a dump being written
  *   files/dre-linked-data/.lock             held while a run is in progress
  *
- * A run writes to a part file and renames it into place, then writes the state
- * the same way, so a reader sees either the previous dump or the new one —
- * never half of one. The dot-files are refused by the web server's hidden-file
- * rule, so an in-progress dump is never served.
+ * A run writes to a part file, writes the new state to a part file too, then
+ * renames the dump and the state into place one right after the other, so a
+ * reader sees either the previous dump or the new one, never half of one. In
+ * the instant between the two renames the state may describe the other file;
+ * the dump route checks the size before trusting the state's checksum as its
+ * ETag ({@see \DRELinkedData\Controller\DatasetController::dumpAction()}). The
+ * dot-files are refused by the web server's hidden-file rule, so an
+ * in-progress dump is never served.
  */
 final class DumpStore
 {
@@ -105,17 +109,21 @@ final class DumpStore
      */
     public function publish(string $partPath, array $state): void
     {
-        if (!@rename($partPath, $this->dumpPath())) {
-            throw new \RuntimeException('Unable to move the new dump into place at ' . $this->dumpPath());
-        }
+        // Everything that can fail slowly happens before the dump moves.
         $statePart = $this->directory . '/.state-' . bin2hex(random_bytes(6)) . '.part';
         $json = json_encode(
             $state,
             JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR
         );
-        if (@file_put_contents($statePart, $json . "\n", LOCK_EX) === false
-            || !@rename($statePart, $this->directory . '/' . self::STATE)
-        ) {
+        if (@file_put_contents($statePart, $json . "\n", LOCK_EX) === false) {
+            @unlink($statePart);
+            throw new \RuntimeException('Unable to write the dump state in ' . $this->directory);
+        }
+        if (!@rename($partPath, $this->dumpPath())) {
+            @unlink($statePart);
+            throw new \RuntimeException('Unable to move the new dump into place at ' . $this->dumpPath());
+        }
+        if (!@rename($statePart, $this->directory . '/' . self::STATE)) {
             @unlink($statePart);
             throw new \RuntimeException('Unable to write the dump state in ' . $this->directory);
         }

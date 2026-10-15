@@ -18,14 +18,25 @@ use DRELinkedData\Rdf\Vocab;
  *   • Subjects and links use the module's {@see UriScheme}, not `/api/items/{id}`.
  *   • Omeka bookkeeping (o:owner, o:resource_template, o:is_public, …) is gone;
  *     the resource class, the title as rdfs:label and the property values remain.
+ *     The label is the first *public* value of the title property (the
+ *     template's, else dcterms:title), never Omeka's resource.title column,
+ *     which is filled from the first title value even when it is private.
+ *   • Each resource is foaf:isPrimaryTopicOf its record page on the default
+ *     site, and that page is dcterms:modified when the record last changed.
  *   • Literals carry their language tag, and Numeric Data Types values become
- *     xsd:gYear / gYearMonth / date / dateTime / integer / duration.
+ *     xsd:gYear / gYearMonth / date / dateTime / integer / duration (only when
+ *     they are real calendar values: 2021-02-31 stays a plain literal).
+ *     Intervals (`1975-03/1980`) have no XSD type and stay plain literals.
  *   • Authority identifiers also yield owl:sameAs / skos:exactMatch links
  *     ({@see IdentityLinks}); a DOI is published bare, as bibo:doi expects,
- *     with a schema:sameAs link to its https://doi.org/ IRI.
+ *     with a schema:sameAs link to its https://doi.org/ IRI. Properties whose
+ *     range is a literal (dcterms:identifier) state a URI value as a string,
+ *     plus its label when it has one; a URI that is not an authority
+ *     identity is kept as a link with rdfs:seeAlso.
  *   • Resource classes can be replaced (fabio:AuthorityFile → skos:Concept);
- *     a concept gets skos:prefLabel and skos:inScheme its item sets, and an
- *     item with no class at all gets a fallback (schema:CreativeWork).
+ *     a concept gets skos:prefLabel and skos:inScheme its item sets, which
+ *     are typed skos:ConceptScheme, and an item with no class at all gets a
+ *     fallback (schema:CreativeWork).
  *   • List properties (bibo:authorList, bibo:editorList) become real rdf:Lists
  *     on hash IRIs, in Omeka's value order, plus a flat dcterms:creator /
  *     dcterms:contributor for each linked member.
@@ -64,6 +75,12 @@ final class ResourceProjector
     /** @var array<string,true> */
     private readonly array $decimalProperties;
 
+    /** @var array<string,true> terms whose range is a literal */
+    private readonly array $literalProperties;
+
+    /** @var string[] class IRIs published as skos:Concept */
+    private readonly array $conceptClasses;
+
     /**
      * @param array<string,mixed> $config the 'projection' config block
      */
@@ -82,6 +99,12 @@ final class ResourceProjector
         $this->classReplacements = (array) ($config['class_replacements'] ?? []);
         $this->listProperties = (array) ($config['list_properties'] ?? []);
         $this->decimalProperties = array_fill_keys((array) ($config['decimal_properties'] ?? []), true);
+        $this->literalProperties = array_fill_keys((array) ($config['literal_properties'] ?? []), true);
+        $concept = Vocab::SKOS . 'Concept';
+        $this->conceptClasses = array_values(array_unique(array_merge(
+            [$concept],
+            array_keys(array_filter($this->classReplacements, static fn ($to): bool => $to === $concept))
+        )));
     }
 
     public function describeOne(int $id): ?ResourceDescription
@@ -101,14 +124,22 @@ final class ResourceProjector
         }
 
         $itemIds = [];
+        $itemSetIds = [];
         $mediaIds = [];
         foreach ($rows as $row) {
             if ($row['resource_type'] === OmekaSource::ITEM) {
                 $itemIds[] = (int) $row['id'];
+            } elseif ($row['resource_type'] === OmekaSource::ITEM_SET) {
+                $itemSetIds[] = (int) $row['id'];
             } elseif ($row['resource_type'] === OmekaSource::MEDIA) {
                 $mediaIds[] = (int) $row['id'];
             }
         }
+        // Item sets that hold concepts are their concept schemes.
+        $conceptSchemes = array_fill_keys(
+            $this->source->itemSetsWithMembersOfClass($itemSetIds, $this->conceptClasses),
+            true
+        );
 
         $values = [];
         $propertyIds = [];
@@ -158,7 +189,8 @@ final class ResourceProjector
                 $itemMedia[$id] ?? [],
                 $media[$id] ?? null,
                 $properties,
-                $classes
+                $classes,
+                isset($conceptSchemes[$id])
             );
         }
         return $descriptions;
@@ -195,6 +227,7 @@ final class ResourceProjector
      * @param array<string,mixed>|null $media
      * @param array<int,array{iri:string,term:string}> $properties the batch's properties, by id
      * @param array<int,string> $classes the batch's resource classes, by id
+     * @param bool $isConceptScheme an item set that concepts are in
      */
     private function project(
         array $row,
@@ -204,7 +237,8 @@ final class ResourceProjector
         array $mediaIds,
         ?array $media,
         array $properties,
-        array $classes
+        array $classes,
+        bool $isConceptScheme = false
     ): ResourceDescription {
         $id = (int) $row['id'];
         $subject = $this->uris->resource($id);
@@ -229,6 +263,9 @@ final class ResourceProjector
             $classIris[] = $this->classReplacements[$class] ?? $class;
         }
         array_push($classIris, ...($this->kindClasses[$kind] ?? []));
+        if ($isConceptScheme && $kind === ResourceDescription::ITEM_SET) {
+            $classIris[] = Vocab::SKOS . 'ConceptScheme';
+        }
         if (!$classIris && $kind === ResourceDescription::ITEM) {
             $classIris = $this->itemFallbackClasses;
         }
@@ -237,7 +274,7 @@ final class ResourceProjector
             $add($type, new Iri($class));
         }
 
-        $title = trim((string) ($row['title'] ?? ''));
+        $title = $this->title($row, $values, $properties);
         if ($title !== '') {
             $add(Vocab::iri(Vocab::RDFS, 'label'), new Literal($title));
         }
@@ -294,10 +331,24 @@ final class ResourceProjector
                     $add($predicate, new Literal($uri));
                     continue;
                 }
-                $add($predicate, new Iri($uri));
                 $link = $this->identityLinks->appliesTo($term)
                     ? $this->identityLinks->match($uri, $templateId)
                     : null;
+                if (isset($this->literalProperties[$term])) {
+                    // dcterms:identifier's range is rdfs:Literal: the URI as a
+                    // string, its label (often the local id) beside it, and the
+                    // link itself through the identity predicate or rdfs:seeAlso.
+                    $add($predicate, new Literal($uri));
+                    $label = trim((string) ($value['value'] ?? ''));
+                    if ($label !== '' && $label !== $uri) {
+                        $add($predicate, new Literal($label));
+                    }
+                    if ($link === null) {
+                        $add(Vocab::iri(Vocab::RDFS, 'seeAlso'), new Iri($uri));
+                    }
+                } else {
+                    $add($predicate, new Iri($uri));
+                }
                 if ($link !== null && $add(new Iri($link['predicate']), new Iri($link['iri']))) {
                     $links[] = ['authority' => $link['authority'], 'predicate' => $link['predicate']];
                 }
@@ -352,13 +403,55 @@ final class ResourceProjector
             }
         }
 
+        // The record page: what the resource is the primary topic of, and
+        // when that record last changed. Per resource, so a harvester of the
+        // dump can tell what moved since its last load.
+        $modifiedAt = $row['modified'] ?? $row['created'] ?? null;
+        $page = $this->uris->page($id, $kind);
+        if ($page !== null) {
+            $pageIri = new Iri($page);
+            $add(Vocab::iri(Vocab::FOAF, 'isPrimaryTopicOf'), $pageIri);
+            $modified = Literal::dateTime($modifiedAt);
+            if ($modified !== null) {
+                $addAbout($pageIri, Vocab::iri(Vocab::DCTERMS, 'modified'), $modified);
+            }
+        }
+
         return new ResourceDescription(
             $id,
             $kind,
-            $row['modified'] ?? $row['created'] ?? null,
+            $modifiedAt,
             array_values($triples),
             $links
         );
+    }
+
+    /**
+     * The label, as Omeka would compute the title from public values only:
+     * the first non-empty public value of the template's title property, or
+     * of dcterms:title when the resource has no template title property.
+     * Empty when no public value qualifies; then no label is stated at all.
+     *
+     * @param array<string,mixed> $row
+     * @param array<int,array<string,mixed>> $values the public values, in order
+     * @param array<int,array{iri:string,term:string}> $properties
+     */
+    private function title(array $row, array $values, array $properties): string
+    {
+        $titlePropertyId = isset($row['title_property_id']) ? (int) $row['title_property_id'] : null;
+        foreach ($values as $value) {
+            $propertyId = (int) $value['property_id'];
+            $term = $properties[$propertyId]['term'] ?? null;
+            if ($term === null || isset($this->excludedTerms[$term])) {
+                continue;
+            }
+            $isTitle = $titlePropertyId !== null ? $propertyId === $titlePropertyId : $term === 'dcterms:title';
+            $text = trim((string) ($value['value'] ?? ''));
+            if ($isTitle && $text !== '') {
+                return $text;
+            }
+        }
+        return '';
     }
 
     /**
@@ -410,9 +503,23 @@ final class ResourceProjector
                 return preg_match('~^-?P(?!$)(\d+Y)?(\d+M)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+(\.\d+)?S)?)?$~', $trimmed)
                     ? new Literal($trimmed, null, Vocab::XSD . 'duration')
                     : new Literal($trimmed);
+            case 'numeric:interval':
+                // `start/end` (ISO 8601). XSD has no interval type, and two
+                // typed dates would need a node of their own; a plain literal
+                // keeps the value whole.
+                return new Literal($trimmed);
         }
         $tag = is_string($language) ? trim($language) : '';
         return new Literal($text, preg_match('~^[A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*$~', $tag) ? $tag : null);
+    }
+
+    /** Proleptic Gregorian, with XSD's year numbering (year 0 = 1 BCE, a leap year). */
+    private static function daysInMonth(int $year, int $month): int
+    {
+        if ($month === 2) {
+            return ($year % 4 === 0 && ($year % 100 !== 0 || $year % 400 === 0)) ? 29 : 28;
+        }
+        return in_array($month, [4, 6, 9, 11], true) ? 30 : 31;
     }
 
     /**
@@ -428,7 +535,7 @@ final class ResourceProjector
         }
         $month = (int) ($m[2] ?? 1);
         $day = (int) ($m[3] ?? 1);
-        if ($month < 1 || $month > 12 || $day < 1 || $day > 31
+        if ($month < 1 || $month > 12 || $day < 1 || $day > self::daysInMonth((int) $m[1], $month)
             || (int) ($m[4] ?? 0) > 23 || (int) ($m[5] ?? 0) > 59 || (int) ($m[6] ?? 0) > 59
         ) {
             return null;

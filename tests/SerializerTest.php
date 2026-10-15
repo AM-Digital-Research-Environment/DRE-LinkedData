@@ -129,3 +129,60 @@ test('Omeka datetimes become UTC xsd:dateTime literals', function (): void {
     assertSameValue(null, Literal::dateTime(''));
     assertSameValue(null, Literal::dateTime('not a date'));
 });
+
+test('RDF/XML writes one description per subject, escaped, typed and tagged', function (): void {
+    $s = new Iri('https://data.example.org/resource/1');
+    $graph = sampleGraph();
+    $graph[] = new Triple($s, new Iri('http://purl.org/dc/terms/description'), new Literal("A & B <c> \"d\"\r\nline\x01 end"));
+    $graph[] = new Triple(new Iri('https://data.example.org/resource/1#authorList-1'), new Iri(Vocab::RDF . 'first'), $s);
+    $graph[] = new Triple(new Iri('https://data.example.org/resource/1#authorList-1'), new Iri(Vocab::RDF . 'rest'), new Iri(Vocab::RDF . 'nil'));
+    $graph[] = new Triple($s, new Iri('http://example.org/v/1'), new Literal('a predicate RDF/XML cannot name'));
+    $graph[] = $graph[0];
+    $xml = (new RdfWriter(static fn (): PrefixMap => new PrefixMap()))->write($graph, Format::RdfXml);
+
+    $dom = new DOMDocument();
+    assertTrue(@$dom->loadXML($xml) === true, "RDF/XML must be well-formed XML:\n" . $xml);
+    assertSameValue('http://www.w3.org/1999/02/22-rdf-syntax-ns#', $dom->documentElement->namespaceURI);
+    assertSameValue('RDF', $dom->documentElement->localName);
+    assertSameValue(2, $dom->getElementsByTagNameNS(Vocab::RDF, 'Description')->length, 'one description per subject');
+    assertContainsText('<rdf:Description rdf:about="https://data.example.org/resource/1">', $xml);
+    assertContainsText('<rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Person"/>', $xml);
+    assertSameValue(1, substr_count($xml, 'foaf/0.1/Person"/>'), 'duplicates collapse');
+    assertContainsText('<dcterms:title xml:lang="de">Ulli Beier</dcterms:title>', $xml);
+    assertContainsText('<dcterms:created rdf:datatype="http://www.w3.org/2001/XMLSchema#gYear">1922</dcterms:created>', $xml);
+    assertContainsText('<dcterms:relation rdf:resource="https://data.example.org/resource/2"/>', $xml);
+    assertContainsText('>A &amp; B &lt;c&gt; "d"&#13;' . "\n" . 'line' . "\u{FFFD}" . ' end<', $xml);
+    assertContainsText('<rdf:rest rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#nil"/>', $xml);
+    assertContainsText(':odd>x</', $xml, 'an unsafe local name is split before its NCName suffix');
+    assertNotContainsText('rdf:datatype="http://www.w3.org/2001/XMLSchema#string"', $xml);
+    assertContainsText('1 statement(s) with a predicate RDF/XML cannot name were left out', $xml);
+
+    $description = $dom->getElementsByTagNameNS('http://purl.org/dc/terms/', 'description')->item(0);
+    assertSameValue("A & B <c> \"d\"\r\nline\u{FFFD} end", $description->textContent, 'the text survives XML parsing intact');
+});
+
+test('JSON-LD never declares a prefix that an absolute IRI would be read through', function (): void {
+    $map = PrefixMap::withVocabularies([['prefix' => 'geo', 'namespace_uri' => 'http://www.w3.org/2003/01/geo/wgs84_pos#']]);
+    $s = new Iri('https://data.example.org/resource/1');
+    $triples = [
+        new Triple($s, new Iri('http://www.w3.org/2003/01/geo/wgs84_pos#lat'), new Literal('49.9')),
+        new Triple($s, new Iri('http://purl.org/dc/terms/spatial'), new Iri('geo:49.9,11.5')),
+    ];
+    $json = json_decode((new JsonLdSerializer($map))->serialize($triples), true, 512, JSON_THROW_ON_ERROR);
+    assertTrue(!isset($json['@context']['geo']), 'geo: would turn geo:49.9,11.5 into a wgs84 term');
+    $node = $json['@graph'][0];
+    assertSameValue([['@value' => '49.9']], $node['http://www.w3.org/2003/01/geo/wgs84_pos#lat']);
+    assertSameValue([['@id' => 'geo:49.9,11.5']], $node['dcterms:spatial']);
+    assertSameValue('http://purl.org/dc/terms/', $json['@context']['dcterms'], 'unaffected prefixes stay');
+
+    $plain = json_decode((new JsonLdSerializer($map))->serialize([$triples[0]]), true, 512, JSON_THROW_ON_ERROR);
+    assertSameValue('http://www.w3.org/2003/01/geo/wgs84_pos#', $plain['@context']['geo'], 'without a collision the prefix is used');
+});
+
+test('IRIs scrub invalid UTF-8 by percent-encoding the stray bytes', function (): void {
+    assertSameValue('https://example.org/caf%E9/%C3', (new Iri("https://example.org/caf\xE9/\xC3"))->value);
+    assertSameValue('https://example.org/café', (new Iri('https://example.org/café'))->value, 'valid UTF-8 is left alone');
+    assertSameValue('urn', (new Iri('URN:isbn:1'))->scheme());
+    $nt = (new NTriplesSerializer())->serialize([new Triple(new Iri("https://example.org/\xFF"), new Iri(Vocab::RDF_TYPE), new Iri('https://example.org/T'))]);
+    assertTrue(mb_check_encoding($nt, 'UTF-8'));
+});

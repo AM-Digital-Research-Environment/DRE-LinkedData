@@ -45,6 +45,18 @@ if (!empty($summary['generatedAt'])) {
         $generated = null;
     }
 }
+$changes = null;
+if (!empty($summary['changes'])) {
+    try {
+        $changes = [
+            'count' => (int) $summary['changes']['count'],
+            'since' => (string) $summary['changes']['since'],
+            'sinceLabel' => $this->i18n()->dateFormat(new \DateTime((string) $summary['changes']['since']), 'long', 'short'),
+        ];
+    } catch (\Exception $e) {
+        $changes = null;
+    }
+}
 $stats = [
     ['label' => $translate('Items'), 'value' => $summary['resources']['items']],
     ['label' => $translate('Item sets'), 'value' => $summary['resources']['itemSets']],
@@ -97,6 +109,16 @@ $stats = [
         </div>
         <?php endif; ?>
     </dl>
+    <?php endif; ?>
+
+    <?php if ($changes): ?>
+    <p class="dre-ld__notice dre-ld__notice--stale">
+        <?php echo $escape(sprintf(
+            $translate('Dump is out of date (%1$s changes since %2$s). Every resource URI already serves the current data.'),
+            $number($changes['count']),
+            $changes['sinceLabel']
+        )); ?>
+    </p>
     <?php endif; ?>
 
     <div class="dre-ld__grid">

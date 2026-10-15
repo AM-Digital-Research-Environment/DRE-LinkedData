@@ -4,14 +4,20 @@
  *
  * @var \Laminas\View\Renderer\PhpRenderer $this
  * @var array<string,mixed> $summary see DRELinkedData\Dataset\DatasetSummary::build()
+ * @var string[] $baseUriWarnings untranslated, see DRELinkedData\Module::baseUriWarnings()
  */
 
 $escape = $this->plugin('escapeHtml');
 $escapeAttr = $this->plugin('escapeHtmlAttr');
 $translate = $this->plugin('translate');
+$baseUriWarnings = $baseUriWarnings ?? [];
+$changes = $summary['changes'] ?? null;
 ?>
 <fieldset class="dre-ld-status">
     <legend><?php echo $escape($translate('Linked Data dump')); ?></legend>
+    <?php foreach ($baseUriWarnings as $warning): ?>
+    <ul class="messages"><li class="warning"><?php echo $escape($translate($warning)); ?></li></ul>
+    <?php endforeach; ?>
     <?php if ($summary['available']): ?>
     <p>
         <?php echo $escape(sprintf(
@@ -24,6 +30,13 @@ $translate = $this->plugin('translate');
             number_format((int) $summary['bytes'])
         )); ?>
     </p>
+    <?php if ($changes): ?>
+    <ul class="messages"><li class="warning"><?php echo $escape(sprintf(
+        $translate('Dump is out of date (%1$s changes since %2$s). Tick "Generate the dump now" below, or run scripts/generate-dump.php.'),
+        number_format((int) $changes['count']),
+        $this->i18n()->dateFormat(new \DateTime((string) $changes['since']), 'medium', 'short')
+    )); ?></li></ul>
+    <?php endif; ?>
     <?php else: ?>
     <p><?php echo $escape($translate('No dump has been generated yet. Tick "Generate the dump now" below and save.')); ?></p>
     <?php endif; ?>

@@ -7,11 +7,13 @@ use DRELinkedData\Controller\DatasetController;
 use DRELinkedData\Controller\ResourceController;
 use DRELinkedData\Dataset\DatasetDescription;
 use DRELinkedData\Dataset\DatasetSummary;
+use DRELinkedData\Dump\ChangeTracker;
 use DRELinkedData\Dump\DumpGenerator;
 use DRELinkedData\Dump\DumpStore;
 use DRELinkedData\Projection\IdentityLinks;
 use DRELinkedData\Projection\OmekaSource;
 use DRELinkedData\Projection\ResourceProjector;
+use DRELinkedData\Projection\SameAs;
 use DRELinkedData\Projection\UriScheme;
 use DRELinkedData\Rdf\PrefixMap;
 use DRELinkedData\Rdf\RdfWriter;
@@ -36,7 +38,10 @@ final class Factory implements FactoryInterface
 
         return match ($requestedName) {
             OmekaSource::class => new OmekaSource($container->get('Omeka\Connection')),
-            UriScheme::class => new UriScheme(self::baseUri($container)),
+            UriScheme::class => new UriScheme(
+                self::baseUri($container),
+                static fn (): ?string => $container->get(DefaultSite::class)->slug()
+            ),
             IdentityLinks::class => new IdentityLinks((array) ($config['projection']['identity_links'] ?? [])),
             ResourceProjector::class => new ResourceProjector(
                 $container->get(OmekaSource::class),
@@ -54,24 +59,35 @@ final class Factory implements FactoryInterface
                 $container->get(DumpStore::class),
                 $container->get(RdfWriter::class)->prefixes(),
                 $container->get('Omeka\Logger'),
-                max(1, (int) ($config['dump']['batch_size'] ?? 250))
+                max(1, (int) ($config['dump']['batch_size'] ?? 250)),
+                $container->get(ChangeTracker::class)
+            ),
+            ChangeTracker::class => new ChangeTracker(
+                $container->get('Omeka\Settings'),
+                $container->get(DumpStore::class)
+            ),
+            SameAs::class => new SameAs(
+                $container->get(OmekaSource::class),
+                $container->get(IdentityLinks::class)
             ),
             DatasetDescription::class => new DatasetDescription(
                 $container->get(UriScheme::class),
-                $container->get(IdentityLinks::class)
+                $container->get(IdentityLinks::class),
+                array_values(array_filter((array) ($config['dataset']['keywords'] ?? []), 'is_string'))
             ),
             DatasetSummary::class => new DatasetSummary(
                 $container->get(DumpStore::class),
                 $container->get(UriScheme::class),
                 $container->get(IdentityLinks::class),
-                static fn (): PrefixMap => $container->get(RdfWriter::class)->prefixes()
+                static fn (): PrefixMap => $container->get(RdfWriter::class)->prefixes(),
+                static fn (int $id): bool => $container->get(OmekaSource::class)->isVisible($id),
+                $container->get(ChangeTracker::class)
             ),
             DefaultSite::class => new DefaultSite($container->get('Omeka\ApiManager'), $container->get('Omeka\Settings')),
             ResourceController::class => new ResourceController(
                 $container->get(ResourceProjector::class),
                 $container->get(UriScheme::class),
                 $container->get(RdfWriter::class),
-                $container->get(DefaultSite::class),
                 $container->get('Omeka\Settings')
             ),
             DatasetController::class => new DatasetController(
@@ -80,7 +96,8 @@ final class Factory implements FactoryInterface
                 $container->get(UriScheme::class),
                 $container->get(RdfWriter::class),
                 $container->get(DefaultSite::class),
-                $container->get('Omeka\Settings')
+                $container->get('Omeka\Settings'),
+                $container->get(OmekaSource::class)
             ),
             // The block layout is registered under its layout name.
             'dreLinkedData', LinkedDataBlock::class => new LinkedDataBlock(
@@ -88,7 +105,13 @@ final class Factory implements FactoryInterface
                 $container->get(DefaultSite::class),
                 $container->get('Omeka\Settings')
             ),
-            LinkedData::class => new LinkedData($container->get(UriScheme::class)),
+            LinkedData::class => new LinkedData(
+                $container->get(UriScheme::class),
+                $container->get(SameAs::class),
+                static fn (): array => $container->get(DatasetSummary::class)->dataset(
+                    DatasetSettings::fromSettings($container->get('Omeka\Settings'), $container->get(DefaultSite::class)->title())
+                )
+            ),
             default => throw new ServiceNotCreatedException(sprintf('%s cannot create %s.', self::class, $requestedName)),
         };
     }

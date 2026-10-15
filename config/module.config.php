@@ -28,6 +28,8 @@ return [
             Dataset\DatasetDescription::class => Service\Factory::class,
             Dataset\DatasetSummary::class => Service\Factory::class,
             Service\DefaultSite::class => Service\Factory::class,
+            Dump\ChangeTracker::class => Service\Factory::class,
+            Projection\SameAs::class => Service\Factory::class,
         ],
     ],
 
@@ -44,8 +46,10 @@ return [
         ],
     ],
 
-    // dreLinkedData($resource) — the resource's URI and RDF documents, for the
-    // theme's record apparatus. The theme guards on the helper's existence.
+    // dreLinkedData($resource) — the resource's URI, record page, identity
+    // links and RDF documents, for the theme's record apparatus and DRE SEO;
+    // dreLinkedData()->dataset() — the dataset as a whole. Consumers guard on
+    // the helper's existence.
     'view_helpers' => [
         'factories' => [
             View\Helper\LinkedData::class => Service\Factory::class,
@@ -63,15 +67,28 @@ return [
 
     'router' => [
         'routes' => [
-            // /resource/{id} (303) and /resource/{id}.{ttl|nt|jsonld}.
+            // /resource/{id} (303) and /resource/{id}.{ttl|nt|jsonld|rdf}. The
+            // extensions are Rdf\Format's (a unit test keeps them in step).
             'dre-linked-data-resource' => [
                 'type' => Segment::class,
                 'options' => [
                     'route' => '/resource/:id[.:format]',
-                    'constraints' => ['id' => '\d+', 'format' => 'ttl|nt|jsonld'],
+                    'constraints' => ['id' => '\d+', 'format' => 'ttl|nt|jsonld|rdf'],
                     'defaults' => [
                         'controller' => Controller\ResourceController::class,
                         'action' => 'index',
+                    ],
+                ],
+            ],
+            // /resource/{id}/ — a trailing slash 301s to the identifier proper.
+            'dre-linked-data-resource-slash' => [
+                'type' => Segment::class,
+                'options' => [
+                    'route' => '/resource/:id/',
+                    'constraints' => ['id' => '\d+'],
+                    'defaults' => [
+                        'controller' => Controller\ResourceController::class,
+                        'action' => 'slash',
                     ],
                 ],
             ],
@@ -79,7 +96,7 @@ return [
                 'type' => Segment::class,
                 'options' => [
                     'route' => '/linked-data/void[.:format]',
-                    'constraints' => ['format' => 'ttl|nt|jsonld'],
+                    'constraints' => ['format' => 'ttl|nt|jsonld|rdf'],
                     'defaults' => [
                         'controller' => Controller\DatasetController::class,
                         'action' => 'void',
@@ -154,6 +171,11 @@ return [
 
             // Literals published as xsd:decimal when they are plain decimals.
             'decimal_properties' => ['geo:lat', 'geo:long'],
+
+            // Properties whose range is a literal. A URI value on one of them is
+            // published as a string (its label too, when it has one), and the
+            // link itself as an identity link or, failing that, rdfs:seeAlso.
+            'literal_properties' => ['dcterms:identifier'],
 
             'identity_links' => [
                 // Properties whose URI values are checked against the authorities.
@@ -235,6 +257,16 @@ return [
         'dump' => [
             // Resources projected per batch; each batch is a handful of queries.
             'batch_size' => 250,
+        ],
+        'dataset' => [
+            // dcat:keyword on the dataset, tagged @en.
+            'keywords' => [
+                'Africa',
+                'African studies',
+                'research data',
+                'cultural heritage',
+                'Linked Open Data',
+            ],
         ],
     ],
 ];

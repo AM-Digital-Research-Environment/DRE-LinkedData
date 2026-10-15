@@ -5,13 +5,16 @@ namespace DRELinkedData\Rdf;
 
 /**
  * The RDF serialisations the module serves. The backing value is the file
- * extension used in document URLs (`/resource/7392.ttl`).
+ * extension used in document URLs (`/resource/7392.ttl`). Case order is the
+ * server preference when a client accepts several formats equally: Turtle
+ * first, RDF/XML last.
  */
 enum Format: string
 {
     case Turtle = 'ttl';
     case NTriples = 'nt';
     case JsonLd = 'jsonld';
+    case RdfXml = 'rdf';
 
     public function mediaType(): string
     {
@@ -19,7 +22,18 @@ enum Format: string
             self::Turtle => 'text/turtle',
             self::NTriples => 'application/n-triples',
             self::JsonLd => 'application/ld+json',
+            self::RdfXml => 'application/rdf+xml',
         };
+    }
+
+    /**
+     * The Content-Type header value. Only Turtle takes a charset parameter:
+     * N-Triples and JSON-LD are UTF-8 by definition and their registrations
+     * define no such parameter, and RDF/XML declares its encoding itself.
+     */
+    public function contentType(): string
+    {
+        return $this === self::Turtle ? $this->mediaType() . '; charset=utf-8' : $this->mediaType();
     }
 
     public function label(): string
@@ -28,6 +42,7 @@ enum Format: string
             self::Turtle => 'Turtle',
             self::NTriples => 'N-Triples',
             self::JsonLd => 'JSON-LD',
+            self::RdfXml => 'RDF/XML',
         };
     }
 
@@ -38,6 +53,7 @@ enum Format: string
             self::Turtle => 'Turtle',
             self::NTriples => 'N-Triples',
             self::JsonLd => 'JSON-LD',
+            self::RdfXml => 'RDF_XML',
         };
     }
 
@@ -55,5 +71,11 @@ enum Format: string
     public static function mediaTypes(): array
     {
         return array_map(static fn (self $format): string => $format->mediaType(), self::cases());
+    }
+
+    /** The route constraint matching every extension (`ttl|nt|jsonld|rdf`). */
+    public static function extensionPattern(): string
+    {
+        return implode('|', array_map(static fn (self $format): string => $format->value, self::cases()));
     }
 }

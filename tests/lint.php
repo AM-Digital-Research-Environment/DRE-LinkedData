@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 $root = dirname(__DIR__);
-$paths = [$root . '/Module.php', $root . '/config', $root . '/src', $root . '/tests', $root . '/view'];
+$paths = [$root . '/Module.php', $root . '/config', $root . '/scripts', $root . '/src', $root . '/tests', $root . '/view'];
 $files = [];
 
 foreach ($paths as $path) {

@@ -69,20 +69,65 @@ final class IdentityLinks
      * URL (`https://doi.org/…`, `http://dx.doi.org/…`), as the bare DOI and its
      * link to the https://doi.org/ IRI.
      *
+     * The literal is the DOI itself, percent-decoded (`%3C` → `<`): a DOI may
+     * legitimately contain `#`, `?` or `%`. The IRI encodes those three again,
+     * so a decoded `%23` never turns the rest of the DOI into a fragment. In a
+     * resolver URL an unencoded `?` or `#` starts the query or fragment, which
+     * is not part of the DOI and is dropped.
+     *
      * @return array{doi:string,authority:string,iri:string,predicate:string}|null
      */
     public function doi(string $value): ?array
     {
-        if (!preg_match('~^(?:https?://(?:dx\.)?doi\.org/|doi:\s*)?(10\.[0-9]{4,9}/\S+)$~i', trim($value), $match)) {
+        if (!preg_match('~^(?:(https?://(?:dx\.)?doi\.org/)|doi:\s*)?(10\.[0-9]{4,9}/\S+)$~i', trim($value), $match)) {
             return null;
         }
-        $doi = rawurldecode($match[1]);
+        $encoded = $match[2];
+        if ($match[1] !== '') {
+            $encoded = (string) preg_replace('~[?#].*$~s', '', $encoded);
+            if (!preg_match('~^10\.[0-9]{4,9}/.~', $encoded)) {
+                return null;
+            }
+        }
+        $doi = rawurldecode($encoded);
         return [
             'doi' => $doi,
             'authority' => 'doi',
-            'iri' => 'https://doi.org/' . $doi,
+            'iri' => 'https://doi.org/' . strtr($doi, ['%' => '%25', '#' => '%23', '?' => '%3F']),
             'predicate' => (string) ($this->config['doi']['predicate'] ?? 'https://schema.org/sameAs'),
         ];
+    }
+
+    /**
+     * The identity link one value yields, exactly as the projection states it:
+     * a DOI property links its https://doi.org/ IRI, an identifier property's
+     * URI links its authority's canonical IRI. Null for anything else.
+     *
+     * @return array{authority:string,iri:string,predicate:string}|null
+     */
+    public function linkFor(string $term, ?string $uri, ?string $text, ?int $templateId): ?array
+    {
+        $uri = trim((string) $uri);
+        if ($this->holdsDoi($term)) {
+            $doi = $this->doi($uri !== '' ? $uri : (string) $text);
+            if ($doi !== null) {
+                unset($doi['doi']);
+                return $doi;
+            }
+        }
+        if ($uri !== '' && $this->appliesTo($term)) {
+            return $this->match($uri, $templateId);
+        }
+        return null;
+    }
+
+    /** @return string[] every term an identity link can come from */
+    public function terms(): array
+    {
+        return array_values(array_unique(array_merge(
+            array_keys($this->properties),
+            array_map('strval', (array) ($this->config['doi']['properties'] ?? []))
+        )));
     }
 
     /**

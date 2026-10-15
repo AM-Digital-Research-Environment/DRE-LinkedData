@@ -20,6 +20,12 @@ use DRELinkedData\Settings\DatasetSettings;
  * publisher, licence, a distribution with media type and size). Both describe
  * the same dataset node, so one document serves both audiences.
  *
+ * Title, description and keywords are tagged `@en`: the editorial settings
+ * are written in English. A contact point (a vCard with the configured email)
+ * is stated only when an address is configured; dcterms:issued is the first
+ * dump ever published, and the distribution carries its SHA-256 as an
+ * spdx:Checksum, as DCAT 3 recommends.
+ *
  * The figures come from the last dump run's state, so they describe exactly
  * the file a client will download. Before the first run the description still
  * says what the dataset is and where its resources live, just without counts
@@ -27,9 +33,11 @@ use DRELinkedData\Settings\DatasetSettings;
  */
 final class DatasetDescription
 {
+    /** @param string[] $keywords dcat:keyword values */
     public function __construct(
         private readonly UriScheme $uris,
         private readonly IdentityLinks $identityLinks,
+        private readonly array $keywords = [],
     ) {
     }
 
@@ -53,10 +61,24 @@ final class DatasetDescription
         $add($dataset, Vocab::RDF, 'type', Vocab::iri(Vocab::VOID, 'Dataset'));
         $add($dataset, Vocab::RDF, 'type', Vocab::iri(Vocab::DCAT, 'Dataset'));
         if ($settings->title !== '') {
-            $add($dataset, Vocab::DCTERMS, 'title', new Literal($settings->title));
+            $add($dataset, Vocab::DCTERMS, 'title', new Literal($settings->title, 'en'));
         }
         if ($settings->description !== '') {
-            $add($dataset, Vocab::DCTERMS, 'description', new Literal($settings->description));
+            $add($dataset, Vocab::DCTERMS, 'description', new Literal($settings->description, 'en'));
+        }
+        foreach ($this->keywords as $keyword) {
+            if (is_string($keyword) && trim($keyword) !== '') {
+                $add($dataset, Vocab::DCAT, 'keyword', new Literal(trim($keyword), 'en'));
+            }
+        }
+        if ($settings->contactEmail !== null) {
+            $contact = $this->uris->contactPoint();
+            $add($dataset, Vocab::DCAT, 'contactPoint', $contact);
+            $add($contact, Vocab::RDF, 'type', Vocab::iri(Vocab::VCARD, 'Kind'));
+            if ($settings->publisherName !== '') {
+                $add($contact, Vocab::VCARD, 'fn', new Literal($settings->publisherName));
+            }
+            $add($contact, Vocab::VCARD, 'hasEmail', new Iri('mailto:' . $settings->contactEmail));
         }
 
         // dcterms:publisher wants an agent, not a string: a configured IRI, or
@@ -89,6 +111,10 @@ final class DatasetDescription
         }
 
         $modified = Literal::dateTime(is_string($state['generated_at'] ?? null) ? $state['generated_at'] : null);
+        $issued = Literal::dateTime(is_string($state['first_generated_at'] ?? null) ? $state['first_generated_at'] : null);
+        if ($issued !== null) {
+            $add($dataset, Vocab::DCTERMS, 'issued', $issued);
+        }
         if ($modified !== null) {
             $add($dataset, Vocab::DCTERMS, 'modified', $modified);
         }
@@ -107,13 +133,21 @@ final class DatasetDescription
         $distribution = $this->uris->distribution();
         $add($dataset, Vocab::DCAT, 'distribution', $distribution);
         $add($distribution, Vocab::RDF, 'type', Vocab::iri(Vocab::DCAT, 'Distribution'));
-        $add($distribution, Vocab::DCTERMS, 'title', new Literal('N-Triples dump (gzip)'));
+        $add($distribution, Vocab::DCTERMS, 'title', new Literal('N-Triples dump (gzip)', 'en'));
         $add($distribution, Vocab::DCAT, 'accessURL', new Iri($this->uris->dump()));
         $add($distribution, Vocab::DCAT, 'downloadURL', new Iri($this->uris->dump()));
         $add($distribution, Vocab::DCAT, 'mediaType', new Iri(Vocab::IANA_MEDIA . Format::NTriples->mediaType()));
         $add($distribution, Vocab::DCAT, 'compressFormat', new Iri(Vocab::IANA_MEDIA . 'application/gzip'));
         if (isset($state['bytes'])) {
             $add($distribution, Vocab::DCAT, 'byteSize', new Literal((string) (int) $state['bytes'], null, Vocab::XSD . 'nonNegativeInteger'));
+        }
+        $sha256 = strtolower((string) ($state['sha256'] ?? ''));
+        if (preg_match('~^[0-9a-f]{64}$~', $sha256)) {
+            $checksum = $this->uris->distributionChecksum();
+            $add($distribution, Vocab::SPDX, 'checksum', $checksum);
+            $add($checksum, Vocab::RDF, 'type', Vocab::iri(Vocab::SPDX, 'Checksum'));
+            $add($checksum, Vocab::SPDX, 'algorithm', Vocab::iri(Vocab::SPDX, 'checksumAlgorithm_sha256'));
+            $add($checksum, Vocab::SPDX, 'checksumValue', new Literal($sha256, null, Vocab::XSD . 'hexBinary'));
         }
         if ($modified !== null) {
             $add($distribution, Vocab::DCTERMS, 'modified', $modified);

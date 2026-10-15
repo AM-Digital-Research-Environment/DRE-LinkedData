@@ -4,7 +4,7 @@ title: "DRE Linked Data: Linked Open Data publication for Omeka S"
 abstract: >-
   An Omeka S module that publishes an Omeka S site as Linked Open Data. Every
   public item, item set and media gets a dereferenceable URI that redirects
-  browsers to the record page and RDF clients to Turtle, N-Triples or JSON-LD,
+  browsers to the record page and RDF clients to Turtle, N-Triples, JSON-LD or RDF/XML,
   following the W3C 303 pattern. The RDF is a clean projection of the record
   rather than Omeka's internal JSON-LD: platform bookkeeping is dropped, private
   values and links to private resources never appear, Numeric Data Types values
@@ -24,8 +24,8 @@ authors:
 repository-code: "https://github.com/AM-Digital-Research-Environment/DRE-LinkedData"
 url: "https://github.com/AM-Digital-Research-Environment/DRE-LinkedData"
 license: GPL-3.0-or-later
-version: 0.2.0
-date-released: "2026-10-14"
+version: 0.3.0
+date-released: "2026-10-15"
 keywords:
   - Omeka S
   - Linked Open Data
@@ -34,6 +34,7 @@ keywords:
   - Turtle
   - N-Triples
   - JSON-LD
+  - RDF/XML
   - VoID
   - DCAT
   - Wikidata

@@ -2,6 +2,8 @@
 declare(strict_types=1);
 
 use DRELinkedData\Projection\IdentityLinks;
+use DRELinkedData\Projection\SameAs;
+use DRELinkedData\Rdf\Format;
 use DRELinkedData\Settings\DatasetSettings;
 
 test('authority patterns accept the identifier shapes AMIRA stores, in canonical form', function (): void {
@@ -113,4 +115,54 @@ test('the vendored token table is the theme’s, untouched', function (): void {
     assertTrue(is_array($table) && isset($table['shared']['--space-4'], $table['light']['--surface']), 'token table must parse');
     $rules = (string) file_get_contents(dirname(__DIR__) . '/scripts/lib/token-rules.mjs');
     assertTrue(str_starts_with($rules, "/**\n * VENDORED from DRE-theme"), 'token-rules.mjs must be the vendored copy');
+});
+
+test('a DOI never decodes into a fragment or a query of its IRI', function (): void {
+    $links = new IdentityLinks(moduleConfig()['projection']['identity_links']);
+    $hash = $links->doi('https://doi.org/10.1000/abc%23def');
+    assertSameValue('10.1000/abc#def', $hash['doi'], 'the DOI itself may contain #');
+    assertSameValue('https://doi.org/10.1000/abc%23def', $hash['iri']);
+    $query = $links->doi('doi:10.1000/a%3Fb%25c');
+    assertSameValue('10.1000/a?b%c', $query['doi']);
+    assertSameValue('https://doi.org/10.1000/a%3Fb%25c', $query['iri']);
+    $url = $links->doi('https://doi.org/10.1000/xyz?utm_source=feed#top');
+    assertSameValue('10.1000/xyz', $url['doi'], 'a resolver URL\'s own query and fragment are not the DOI');
+    assertSameValue(null, $links->doi('https://doi.org/10.1000/?x'));
+});
+
+test('identity links are reported per value exactly as the projection states them', function (): void {
+    $links = new IdentityLinks(moduleConfig()['projection']['identity_links']);
+    assertSameValue(['dcterms:identifier', 'bibo:doi'], $links->terms());
+    assertSameValue('https://doi.org/10.1017/X1', $links->linkFor('bibo:doi', null, '10.1017/X1', null)['iri']);
+    assertSameValue('http://www.wikidata.org/entity/Q1', $links->linkFor('dcterms:identifier', 'https://www.wikidata.org/wiki/Q1', 'Q1', 6)['iri']);
+    assertSameValue(null, $links->linkFor('dcterms:identifier', null, 'Q1', null), 'a literal identifier is no link');
+    assertSameValue(null, $links->linkFor('dre:collectionUrl', 'https://www.wikidata.org/wiki/Q1', null, null));
+
+    $source = amiraSource();
+    $sameAs = new SameAs($source, $links);
+    assertSameValue(['https://d-nb.info/gnd/124120881'], $sameAs->of(149, 4));
+    assertSameValue(['https://doi.org/10.1017/S0021853721000372', 'https://doi.org/10.1086/ahr/110.2.%3C123%3E'], $sameAs->of(7392, 10));
+    assertSameValue(['http://id.loc.gov/authorities/subjects/sh85149367'], $sameAs->of(2390, 6), 'skos:exactMatch targets count; the playlist does not');
+    assertSameValue([], $sameAs->of(6259, null));
+    $sameAs->of(149, 4);
+    assertSameValue(4, count($source->termRequests), 'one query per resource, remembered');
+
+    // The helper's list is the projection's list.
+    $projected = [];
+    foreach (amiraProjector()->describeOne(7392)->triples as $triple) {
+        if (in_array($triple->predicate->value, ['http://www.w3.org/2002/07/owl#sameAs', 'http://www.w3.org/2004/02/skos/core#exactMatch', 'https://schema.org/sameAs'], true)) {
+            $projected[] = $triple->object->value;
+        }
+    }
+    assertSameValue($projected, $sameAs->of(7392, 10));
+});
+
+test('route extensions follow the formats, and the projection config has its new keys', function (): void {
+    $config = include dirname(__DIR__) . '/config/module.config.php';
+    $routes = $config['router']['routes'];
+    assertSameValue(Format::extensionPattern(), $routes['dre-linked-data-resource']['options']['constraints']['format']);
+    assertSameValue(Format::extensionPattern(), $routes['dre-linked-data-void']['options']['constraints']['format']);
+    assertSameValue('slash', $routes['dre-linked-data-resource-slash']['options']['defaults']['action']);
+    assertTrue(in_array('dcterms:identifier', $config['dre_linked_data']['projection']['literal_properties'], true));
+    assertTrue(count($config['dre_linked_data']['dataset']['keywords']) >= 3, 'a few dataset keywords');
 });
