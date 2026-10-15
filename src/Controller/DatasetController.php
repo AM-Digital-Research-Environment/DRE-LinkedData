@@ -5,6 +5,7 @@ namespace DRELinkedData\Controller;
 
 use DRELinkedData\Dataset\DatasetDescription;
 use DRELinkedData\Dump\DumpStore;
+use DRELinkedData\Projection\OmekaSource;
 use DRELinkedData\Projection\UriScheme;
 use DRELinkedData\Rdf\ContentNegotiator;
 use DRELinkedData\Rdf\Format;
@@ -18,15 +19,19 @@ use Omeka\Settings\Settings;
 /**
  * Dataset-level endpoints:
  *
- *   GET /linked-data/void[.ttl|.nt|.jsonld]   VoID + DCAT description
- *   GET /.well-known/void                     303 → /linked-data/void (RFC 8615 / VoID §6.2)
- *   GET /linked-data/dump.nt.gz               the full dump, gzipped N-Triples
+ *   GET /linked-data/void[.ttl|.nt|.jsonld|.rdf]   VoID + DCAT description
+ *   GET /.well-known/void                          303 → /linked-data/void (RFC 8615 / VoID §6.2)
+ *   GET /linked-data/dump.nt.gz                    the full dump, gzipped N-Triples
  *
- * The description has no HTML form — the page block is the human view — so an
- * unqualified request negotiates among the RDF formats and defaults to Turtle.
+ * The description's human form is the site page carrying the "Linked open
+ * data" block: a browser asking /linked-data/void for HTML is sent there.
+ * Without such a page, and for every other client, the extension-less URL
+ * negotiates among the RDF formats and defaults to Turtle.
  */
 class DatasetController extends AbstractRdfController
 {
+    public const BLOCK_LAYOUT = 'dreLinkedData';
+
     public function __construct(
         private readonly DatasetDescription $description,
         private readonly DumpStore $store,
@@ -34,6 +39,7 @@ class DatasetController extends AbstractRdfController
         private readonly RdfWriter $writer,
         private readonly DefaultSite $site,
         private readonly Settings $settings,
+        private readonly OmekaSource $source,
     ) {
     }
 
@@ -41,9 +47,23 @@ class DatasetController extends AbstractRdfController
     {
         $extension = $this->params()->fromRoute('format');
         $negotiated = $extension === null || $extension === '';
-        $format = $negotiated
-            ? Format::fromMediaType((string) ContentNegotiator::negotiate($this->accept(), Format::mediaTypes())) ?? Format::Turtle
-            : Format::tryFrom((string) $extension);
+        if ($negotiated) {
+            $accept = $this->accept();
+            $offers = Format::mediaTypes();
+            // Only a client that names HTML can prefer it; RDF clients never
+            // pay for the page lookup.
+            $page = $accept !== null && stripos($accept, 'html') !== false ? $this->linkedDataPage() : null;
+            if ($page !== null) {
+                $offers[] = ContentNegotiator::HTML;
+            }
+            $chosen = ContentNegotiator::negotiate($accept, $offers);
+            if ($chosen === ContentNegotiator::HTML && $page !== null) {
+                return $this->seeOther($page);
+            }
+            $format = Format::fromMediaType((string) $chosen) ?? Format::Turtle;
+        } else {
+            $format = Format::tryFrom((string) $extension);
+        }
         if ($format === null) {
             return $this->notFound();
         }
@@ -64,7 +84,13 @@ class DatasetController extends AbstractRdfController
             $this->writer->write($triples, $format),
             $format,
             is_string($state['generated_at'] ?? null) ? $state['generated_at'] : null,
-            $negotiated
+            $negotiated,
+            self::documentLinks(
+                $format,
+                fn (Format $other): string => $this->uris->voidDocument($other),
+                $this->uris->dataset()->value
+            ),
+            $negotiated ? $this->uris->voidDocument($format) : null
         );
     }
 
@@ -82,13 +108,24 @@ class DatasetController extends AbstractRdfController
             return $this->notFound();
         }
 
-        $etag = '"' . substr((string) ($state['sha256'] ?? hash_file('sha256', $path)), 0, 32) . '"';
+        // The state's checksum is the ETag only when it describes the file
+        // actually opened: while a new dump is swapped in, state.json and
+        // dump.nt.gz are renamed one after the other.
+        $size = (int) (fstat($handle)['size'] ?? 0);
+        $mtime = (int) (fstat($handle)['mtime'] ?? 0);
+        $sha256 = (string) ($state['sha256'] ?? '');
+        $etag = $sha256 !== '' && (int) ($state['bytes'] ?? -1) === $size
+            ? '"' . substr($sha256, 0, 32) . '"'
+            : 'W/"' . dechex($size) . '-' . dechex($mtime) . '"';
+
         $response = new Stream();
         $headers = $response->getHeaders();
         $headers->addHeaderLine('Content-Type', 'application/gzip');
         $headers->addHeaderLine('ETag', $etag);
         $headers->addHeaderLine('Cache-Control', 'public, max-age=0, must-revalidate');
         $headers->addHeaderLine('Access-Control-Allow-Origin', '*');
+        $headers->addHeaderLine('Access-Control-Expose-Headers', self::EXPOSED_HEADERS);
+        $headers->addHeaderLine('Link', '<' . $this->uris->voidDocument(Format::Turtle) . '>; rel="describedby"; type="text/turtle"');
         $modified = $this->httpDate(is_string($state['generated_at'] ?? null) ? $state['generated_at'] : null);
         if ($modified !== null) {
             $headers->addHeaderLine('Last-Modified', $modified);
@@ -101,10 +138,22 @@ class DatasetController extends AbstractRdfController
 
         $filename = ($this->site->slug() ?? 'omeka') . '-linked-data.nt.gz';
         $headers->addHeaderLine('Content-Disposition', 'attachment; filename="' . $filename . '"');
-        $headers->addHeaderLine('Content-Length', (string) filesize($path));
+        $headers->addHeaderLine('Content-Length', (string) $size);
         $response->setStatusCode(200);
         $response->setStream($handle);
         $response->setStreamName($filename);
         return $response;
+    }
+
+    /** The public page carrying the Linked open data block, on the default site first. */
+    private function linkedDataPage(): ?string
+    {
+        try {
+            $siteId = $this->site->get()?->id();
+            $pages = $this->source->pagesWithBlock(self::BLOCK_LAYOUT, $siteId !== null ? (int) $siteId : null);
+        } catch (\Throwable) {
+            return null;
+        }
+        return $pages ? $this->uris->sitePage($pages[0]['site_slug'], $pages[0]['page_slug']) : null;
     }
 }

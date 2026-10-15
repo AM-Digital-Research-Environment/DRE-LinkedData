@@ -8,7 +8,6 @@ use DRELinkedData\Projection\UriScheme;
 use DRELinkedData\Rdf\ContentNegotiator;
 use DRELinkedData\Rdf\Format;
 use DRELinkedData\Rdf\RdfWriter;
-use DRELinkedData\Service\DefaultSite;
 use DRELinkedData\Settings\DatasetSettings;
 use Laminas\Http\Response;
 use Omeka\Settings\Settings;
@@ -21,9 +20,12 @@ use Omeka\Settings\Settings;
  *   GET /resource/{id}.ttl      Turtle
  *   GET /resource/{id}.nt       N-Triples
  *   GET /resource/{id}.jsonld   JSON-LD
+ *   GET /resource/{id}.rdf      RDF/XML
+ *   GET /resource/{id}/         301 → /resource/{id}
  *
  * The identifier names the thing; the documents describe it. A resource that
  * is missing or not public is a 404 on every route, so existence never leaks.
+ * Every redirect target is absolute, built on the configured base URI.
  */
 class ResourceController extends AbstractRdfController
 {
@@ -31,7 +33,6 @@ class ResourceController extends AbstractRdfController
         private readonly ResourceProjector $projector,
         private readonly UriScheme $uris,
         private readonly RdfWriter $writer,
-        private readonly DefaultSite $site,
         private readonly Settings $settings,
     ) {
     }
@@ -51,13 +52,9 @@ class ResourceController extends AbstractRdfController
                 return $this->notAcceptable(ContentNegotiator::offers());
             }
             $format = ContentNegotiator::rdfFormat($accept);
-            $slug = $this->site->slug();
-            if ($format === null && $slug !== null) {
-                return $this->seeOther($this->url()->fromRoute('site/resource-id', [
-                    'site-slug' => $slug,
-                    'controller' => $description->siteController(),
-                    'id' => $id,
-                ]));
+            $page = $format === null ? $this->uris->page($id, $description->kind) : null;
+            if ($page !== null) {
+                return $this->seeOther($page);
             }
             return $this->seeOther($this->uris->resourceDocument($id, $format ?? Format::Turtle));
         }
@@ -70,7 +67,19 @@ class ResourceController extends AbstractRdfController
         return $this->rdf(
             $this->writer->write($this->projector->document($description, $format, $licence), $format),
             $format,
-            $description->modified
+            $description->modified,
+            false,
+            self::documentLinks(
+                $format,
+                fn (Format $other): string => $this->uris->resourceDocument($id, $other),
+                $this->uris->resource($id)->value
+            )
         );
+    }
+
+    /** `/resource/{id}/` is not the identifier; send clients to the one that is. */
+    public function slashAction(): Response
+    {
+        return $this->movedPermanently($this->uris->resource((int) $this->params()->fromRoute('id', 0))->value);
     }
 }
