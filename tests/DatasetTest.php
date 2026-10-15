@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 use DRELinkedData\Dataset\DatasetDescription;
 use DRELinkedData\Dataset\DatasetSummary;
+use DRELinkedData\Dump\ChangeTracker;
 use DRELinkedData\Dump\DumpStore;
 use DRELinkedData\Projection\IdentityLinks;
 use DRELinkedData\Projection\UriScheme;
@@ -35,7 +36,8 @@ function description(): DatasetDescription
 {
     return new DatasetDescription(
         new UriScheme(FIXTURE_BASE),
-        new IdentityLinks(moduleConfig()['projection']['identity_links'])
+        new IdentityLinks(moduleConfig()['projection']['identity_links']),
+        moduleConfig()['dataset']['keywords']
     );
 }
 
@@ -120,7 +122,9 @@ test('the summary gives templates everything they show', function (): void {
         assertSameValue(false, $empty['available']);
         assertSameValue(null, $empty['example']);
         assertSameValue(FIXTURE_BASE . '/resource/{id}', $empty['uriPattern']);
-        assertSameValue(3, count($empty['void']));
+        assertSameValue(4, count($empty['void']));
+        assertSameValue('RDF/XML', $empty['void'][3]['label']);
+        assertSameValue(null, $empty['changes']);
 
         file_put_contents($dir . '/dump.nt.gz', gzencode("<a:b> <a:c> <a:d> .\n"));
         file_put_contents($dir . '/state.json', json_encode(sampleState()));
@@ -133,6 +137,99 @@ test('the summary gives templates everything they show', function (): void {
         assertSameValue(['prefix' => 'dcterms', 'namespace' => 'http://purl.org/dc/terms/'], $full['vocabularies'][0]);
         assertSameValue(['prefix' => '', 'namespace' => 'http://am-digital.org/ontology/dre/'], $full['vocabularies'][1]);
         assertSameValue(8001, $summary->build($settings, 8001)['example']['id'], 'an editor-chosen example wins');
+
+        $checked = new DatasetSummary($store, new UriScheme(FIXTURE_BASE), new IdentityLinks(moduleConfig()['projection']['identity_links']), static fn (): PrefixMap => new PrefixMap(), static fn (int $id): bool => amiraSource()->isVisible($id));
+        assertSameValue(8001, $checked->build($settings, 8001)['example']['id'], 'a public example is kept');
+        assertSameValue(7392, $checked->build($settings, 9999)['example']['id'], 'a private or missing example falls back to the dump\'s');
+    } finally {
+        removeDirectory($dir);
+    }
+});
+
+test('the DCAT description has a contact point, issue date, keywords, checksum and English labels', function (): void {
+    $settings = new DatasetSettings('AMIRA', 'Research data.', 'Africa Multiple Cluster of Excellence', null, 'https://creativecommons.org/publicdomain/zero/1.0/', 'dre@example.org');
+    $state = sampleState() + ['first_generated_at' => '2026-10-01T08:00:00Z'];
+    $nt = (new NTriplesSerializer())->serialize(description()->triples($settings, $state, null, null));
+    $dataset = '<' . FIXTURE_BASE . '/linked-data/void#dataset>';
+    $contact = '<' . FIXTURE_BASE . '/linked-data/void#contact>';
+    $checksum = '<' . FIXTURE_BASE . '/linked-data/void#dump-sha256>';
+    $xsd = 'http://www.w3.org/2001/XMLSchema#';
+
+    assertContainsText($dataset . ' <http://purl.org/dc/terms/title> "AMIRA"@en .', $nt);
+    assertContainsText($dataset . ' <http://purl.org/dc/terms/description> "Research data."@en .', $nt);
+    assertContainsText($dataset . ' <http://www.w3.org/ns/dcat#keyword> "research data"@en .', $nt);
+    assertContainsText($dataset . ' <http://www.w3.org/ns/dcat#contactPoint> ' . $contact . ' .', $nt);
+    assertContainsText($contact . ' <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2006/vcard/ns#Kind> .', $nt);
+    assertContainsText($contact . ' <http://www.w3.org/2006/vcard/ns#hasEmail> <mailto:dre@example.org> .', $nt);
+    assertContainsText($contact . ' <http://www.w3.org/2006/vcard/ns#fn> "Africa Multiple Cluster of Excellence" .', $nt);
+    assertContainsText($dataset . ' <http://purl.org/dc/terms/issued> "2026-10-01T08:00:00Z"^^<' . $xsd . 'dateTime> .', $nt);
+    assertContainsText('<' . FIXTURE_BASE . '/linked-data/void#dump> <http://spdx.org/rdf/terms#checksum> ' . $checksum . ' .', $nt);
+    assertContainsText($checksum . ' <http://spdx.org/rdf/terms#algorithm> <http://spdx.org/rdf/terms#checksumAlgorithm_sha256> .', $nt);
+    assertContainsText($checksum . ' <http://spdx.org/rdf/terms#checksumValue> "' . str_repeat('ab', 32) . '"^^<' . $xsd . 'hexBinary> .', $nt);
+    assertContainsText('<http://purl.org/dc/terms/title> "N-Triples dump (gzip)"@en .', $nt);
+    assertContainsText($dataset . ' <http://rdfs.org/ns/void#feature> <http://www.w3.org/ns/formats/RDF_XML> .', $nt);
+
+    $none = (new NTriplesSerializer())->serialize(description()->triples(new DatasetSettings('AMIRA', '', '', null, null), sampleState(), null, null));
+    assertNotContainsText('contactPoint', $none, 'no address, no contact point');
+    assertNotContainsText('vcard', $none);
+});
+
+test('a contact email must be an address', function (): void {
+    assertSameValue('dre@example.org', DatasetSettings::fromSettings(new Settings([DatasetSettings::CONTACT_EMAIL => ' dre@example.org ']), 'x')->contactEmail);
+    assertSameValue(null, DatasetSettings::fromSettings(new Settings([DatasetSettings::CONTACT_EMAIL => 'not an address']), 'x')->contactEmail);
+    assertSameValue(null, DatasetSettings::fromSettings(new Settings(), 'x')->contactEmail);
+    foreach (array_merge(DatasetSettings::KEYS, DatasetSettings::INTERNAL_KEYS) as $key) {
+        assertTrue(str_starts_with($key, 'dre_ld_'), $key);
+    }
+    assertTrue(!in_array(DatasetSettings::CHANGES, DatasetSettings::KEYS, true), 'the form must never overwrite the change record');
+});
+
+test('dataset() follows the helper contract', function (): void {
+    $dir = tempDirectory('dataset');
+    try {
+        $store = new DumpStore($dir);
+        $summary = new DatasetSummary($store, new UriScheme(FIXTURE_BASE), new IdentityLinks(moduleConfig()['projection']['identity_links']), static fn (): PrefixMap => new PrefixMap());
+        $settings = new DatasetSettings('AMIRA', 'About.', 'Africa Multiple', 'http://www.wikidata.org/entity/Q141717295', 'https://creativecommons.org/publicdomain/zero/1.0/');
+
+        $before = $summary->dataset($settings);
+        assertSameValue(['uri', 'void', 'title', 'description', 'licence', 'publisher', 'modified', 'triples', 'entities', 'distributions'], array_keys($before));
+        assertSameValue(FIXTURE_BASE . '/linked-data/void#dataset', $before['uri']);
+        assertSameValue(FIXTURE_BASE . '/linked-data/void', $before['void']);
+        assertSameValue(['name' => 'Africa Multiple', 'uri' => 'http://www.wikidata.org/entity/Q141717295'], $before['publisher']);
+        assertSameValue([null, null, null, []], [$before['modified'], $before['triples'], $before['entities'], $before['distributions']]);
+
+        file_put_contents($dir . '/dump.nt.gz', gzencode("<a:b> <a:c> <a:d> .\n"));
+        file_put_contents($dir . '/state.json', json_encode(sampleState()));
+        $after = $summary->dataset($settings);
+        assertSameValue('2026-10-05T12:00:00Z', $after['modified']);
+        assertSameValue(412345, $after['triples']);
+        assertSameValue(12477, $after['entities']);
+        assertSameValue([[
+            'label' => 'N-Triples dump (gzip)',
+            'url' => FIXTURE_BASE . '/linked-data/dump.nt.gz',
+            'type' => 'application/n-triples',
+            'encoding' => 'application/gzip',
+            'bytes' => 5242880,
+        ]], $after['distributions']);
+        assertSameValue(null, $summary->dataset(new DatasetSettings('AMIRA', '', '', null, null))['licence']);
+    } finally {
+        removeDirectory($dir);
+    }
+});
+
+test('the summary says when the dump is out of date', function (): void {
+    $dir = tempDirectory('summary-stale');
+    try {
+        $store = new DumpStore($dir);
+        file_put_contents($dir . '/dump.nt.gz', gzencode("<a:b> <a:c> <a:d> .\n"));
+        file_put_contents($dir . '/state.json', json_encode(['started_at' => '2026-10-05T11:59:00Z'] + sampleState()));
+        $settings = new Settings([DatasetSettings::CHANGES => ['since' => '2026-10-06T08:00:00Z', 'count' => 7, 'last' => '2026-10-06T09:00:00Z']]);
+        $summary = new DatasetSummary($store, new UriScheme(FIXTURE_BASE), new IdentityLinks(moduleConfig()['projection']['identity_links']), static fn (): PrefixMap => new PrefixMap(), null, new ChangeTracker($settings, $store));
+        $built = $summary->build(new DatasetSettings('AMIRA', '', '', null, null));
+        assertSameValue(['since' => '2026-10-06T08:00:00Z', 'count' => 7], $built['changes']);
+
+        $settings->set(DatasetSettings::CHANGES, ['since' => '2026-10-04T08:00:00Z', 'count' => 3, 'last' => '2026-10-04T09:00:00Z']);
+        assertSameValue(null, $summary->build(new DatasetSettings('AMIRA', '', '', null, null))['changes'], 'changes before the dump started are in it');
     } finally {
         removeDirectory($dir);
     }

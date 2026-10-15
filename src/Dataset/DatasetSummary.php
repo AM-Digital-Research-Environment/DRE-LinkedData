@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace DRELinkedData\Dataset;
 
+use DRELinkedData\Dump\ChangeTracker;
 use DRELinkedData\Dump\DumpStore;
 use DRELinkedData\Projection\IdentityLinks;
 use DRELinkedData\Projection\UriScheme;
@@ -12,28 +13,72 @@ use DRELinkedData\Settings\DatasetSettings;
 
 /**
  * The plain-array view model behind the public page block and the admin
- * status panel: what the dataset is, what the last dump contains, and where
- * every machine-readable entry point lives. Templates only format it.
+ * status panel: what the dataset is, what the last dump contains, whether it
+ * is out of date, and where every machine-readable entry point lives.
+ * Templates only format it. {@see dataset()} is the same information in the
+ * shape the dreLinkedData()->dataset() helper contract promises.
  */
 final class DatasetSummary
 {
-    /** @param \Closure():PrefixMap $prefixes */
+    /**
+     * @param \Closure():PrefixMap $prefixes
+     * @param (\Closure(int):bool)|null $isVisible whether a resource id is public
+     */
     public function __construct(
         private readonly DumpStore $store,
         private readonly UriScheme $uris,
         private readonly IdentityLinks $identityLinks,
         private readonly \Closure $prefixes,
+        private readonly ?\Closure $isVisible = null,
+        private readonly ?ChangeTracker $changes = null,
     ) {
     }
 
     /**
+     * The dataset as the view helper contract describes it (README, "For the
+     * theme and DRE SEO").
+     *
+     * @return array<string,mixed>
+     */
+    public function dataset(DatasetSettings $settings): array
+    {
+        $state = $this->store->state();
+        $distributions = [];
+        if ($state !== null) {
+            $distributions[] = [
+                'label' => 'N-Triples dump (gzip)',
+                'url' => $this->uris->dump(),
+                'type' => Format::NTriples->mediaType(),
+                'encoding' => 'application/gzip',
+                'bytes' => isset($state['bytes']) ? (int) $state['bytes'] : null,
+            ];
+        }
+        return [
+            'uri' => $this->uris->dataset()->value,
+            'void' => $this->uris->voidDocument(),
+            'title' => $settings->title,
+            'description' => $settings->description,
+            'licence' => $settings->licence,
+            'publisher' => ['name' => $settings->publisherName, 'uri' => $settings->publisherUri],
+            'modified' => is_string($state['generated_at'] ?? null) ? $state['generated_at'] : null,
+            'triples' => isset($state['triples']) ? (int) $state['triples'] : null,
+            'entities' => isset($state['resources']) ? (int) array_sum((array) $state['resources']) : null,
+            'distributions' => $distributions,
+        ];
+    }
+
+    /**
      * @param int|null $exampleId a resource to show as the worked example;
-     *                            defaults to the dump's richest item
+     *                            defaults to the dump's richest item. One that
+     *                            is not public is ignored: its documents 404.
      * @return array<string,mixed>
      */
     public function build(DatasetSettings $settings, ?int $exampleId = null): array
     {
         $state = $this->store->state();
+        if ($exampleId !== null && $this->isVisible !== null && !($this->isVisible)($exampleId)) {
+            $exampleId = null;
+        }
 
         $documents = static fn (callable $url): array => array_map(
             static fn (Format $format): array => [
@@ -99,6 +144,9 @@ final class DatasetSummary
             'example' => $example,
             'linksets' => $linksets,
             'vocabularies' => $vocabularies,
+            // ['since' => ISO date, 'count' => n] when the data changed after
+            // the dump was taken; null when it is up to date (or never made).
+            'changes' => $state !== null ? $this->changes?->pending($state) : null,
         ];
     }
 

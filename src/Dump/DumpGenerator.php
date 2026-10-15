@@ -32,6 +32,7 @@ final class DumpGenerator
         private readonly PrefixMap $prefixes,
         private readonly LoggerInterface $logger,
         private readonly int $batchSize = 250,
+        private readonly ?ChangeTracker $changes = null,
     ) {
     }
 
@@ -49,6 +50,8 @@ final class DumpGenerator
         }
 
         $started = microtime(true);
+        $startedAt = gmdate('Y-m-d\TH:i:s\Z');
+        $previous = $this->store->state();
         $partPath = $this->store->partPath();
         $gzip = gzopen($partPath, 'wb6');
         if ($gzip === false) {
@@ -115,9 +118,16 @@ final class DumpGenerator
 
             ksort($vocabularies);
             ksort($linksets);
+            $generatedAt = gmdate('Y-m-d\TH:i:s\Z');
             $state = [
-                'version' => 1,
-                'generated_at' => gmdate('Y-m-d\TH:i:s\Z'),
+                'version' => 2,
+                'started_at' => $startedAt,
+                'generated_at' => $generatedAt,
+                // When the dataset was first published (dcterms:issued), carried
+                // over from run to run.
+                'first_generated_at' => is_string($previous['first_generated_at'] ?? null)
+                    ? $previous['first_generated_at']
+                    : (is_string($previous['generated_at'] ?? null) ? $previous['generated_at'] : $generatedAt),
                 'duration_seconds' => round(microtime(true) - $started, 1),
                 'triples' => $triples,
                 'resources' => [
@@ -139,6 +149,7 @@ final class DumpGenerator
                 'example_resource' => $example,
             ];
             $this->store->publish($partPath, $state);
+            $this->changes?->settle($startedAt);
 
             $this->logger->info(sprintf(
                 'DRELinkedData: wrote %d triples for %d resources in %.1f s.',

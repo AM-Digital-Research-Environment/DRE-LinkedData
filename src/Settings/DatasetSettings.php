@@ -8,9 +8,11 @@ use Omeka\Settings\Settings;
 /**
  * The editorial settings (Modules → DRE Linked Data → Configure).
  *
- * The keys here are the module's whole persistent settings surface; uninstall
+ * KEYS are the settings the configuration form edits; INTERNAL_KEYS are the
+ * ones the module keeps for itself (the change tracker's record). Together
+ * they are the module's whole persistent settings surface, and uninstall
  * deletes exactly these. Everything structural (excluded terms, authority
- * patterns, classes) is module config, not a setting.
+ * patterns, classes, keywords) is module config, not a setting.
  */
 final class DatasetSettings
 {
@@ -20,6 +22,10 @@ final class DatasetSettings
     public const PUBLISHER_NAME = 'dre_ld_publisher_name';
     public const PUBLISHER_URI = 'dre_ld_publisher_uri';
     public const LICENCE = 'dre_ld_licence';
+    public const CONTACT_EMAIL = 'dre_ld_contact_email';
+
+    /** Changes since the last dump ({@see \DRELinkedData\Dump\ChangeTracker}). */
+    public const CHANGES = 'dre_ld_changes';
 
     public const KEYS = [
         self::BASE_URI,
@@ -28,6 +34,11 @@ final class DatasetSettings
         self::PUBLISHER_NAME,
         self::PUBLISHER_URI,
         self::LICENCE,
+        self::CONTACT_EMAIL,
+    ];
+
+    public const INTERNAL_KEYS = [
+        self::CHANGES,
     ];
 
     public function __construct(
@@ -36,6 +47,7 @@ final class DatasetSettings
         public readonly string $publisherName,
         public readonly ?string $publisherUri,
         public readonly ?string $licence,
+        public readonly ?string $contactEmail = null,
     ) {
     }
 
@@ -47,6 +59,7 @@ final class DatasetSettings
             $value = $text($key);
             return preg_match('~^https?://\S+$~i', $value) ? $value : null;
         };
+        $email = $text(self::CONTACT_EMAIL);
 
         return new self(
             $text(self::TITLE) !== '' ? $text(self::TITLE) : $fallbackTitle,
@@ -54,6 +67,7 @@ final class DatasetSettings
             $text(self::PUBLISHER_NAME),
             $uri(self::PUBLISHER_URI),
             $uri(self::LICENCE),
+            filter_var($email, FILTER_VALIDATE_EMAIL) !== false ? $email : null,
         );
     }
 }
