@@ -312,6 +312,7 @@ $this->dreLinkedData()->dataset(); // the dataset as a whole, built once per req
 [
   'uri'         => 'https://…/linked-data/void#dataset',
   'void'        => 'https://…/linked-data/void',
+  'landingPage' => 'https://…/s/amira/page/linked-open-data', // the page with the block, or null (0.3.1+)
   'title'       => 'Africa Multiple Interactive Research Atlas (AMIRA)',
   'description' => '…',                    // the dataset description setting
   'licence'     => 'https://creativecommons.org/publicdomain/zero/1.0/', // or null

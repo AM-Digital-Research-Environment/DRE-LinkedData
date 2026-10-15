@@ -40,7 +40,7 @@ final class DatasetSummary
      *
      * @return array<string,mixed>
      */
-    public function dataset(DatasetSettings $settings): array
+    public function dataset(DatasetSettings $settings, ?string $landingPage = null): array
     {
         $state = $this->store->state();
         $distributions = [];
@@ -56,6 +56,7 @@ final class DatasetSummary
         return [
             'uri' => $this->uris->dataset()->value,
             'void' => $this->uris->voidDocument(),
+            'landingPage' => $landingPage,
             'title' => $settings->title,
             'description' => $settings->description,
             'licence' => $settings->licence,

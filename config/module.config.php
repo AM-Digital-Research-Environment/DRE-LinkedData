@@ -27,6 +27,7 @@ return [
             Dump\DumpGenerator::class => Service\Factory::class,
             Dataset\DatasetDescription::class => Service\Factory::class,
             Dataset\DatasetSummary::class => Service\Factory::class,
+            Dataset\LandingPage::class => Service\Factory::class,
             Service\DefaultSite::class => Service\Factory::class,
             Dump\ChangeTracker::class => Service\Factory::class,
             Projection\SameAs::class => Service\Factory::class,

@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-10-15
+
+### Changed
+
+- The dataset's `dcat:landingPage` is now the public page that carries the *Linked open data* block (on AMIRA, `/s/amira/page/linked-open-data`), not the site's home. That page explains the figures, the dump and the URIs, so catalogues and dataset search engines should send people there. `foaf:homepage` stays the site. Without such a page, the home is still the landing page.
+- `dreLinkedData()->dataset()` returns that page as `landingPage` (null without one), so DRE SEO can give the schema.org `Dataset` the same page.
+
 ## [0.3.0] — 2026-10-15
 
 ### Fixed

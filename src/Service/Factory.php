@@ -7,6 +7,7 @@ use DRELinkedData\Controller\DatasetController;
 use DRELinkedData\Controller\ResourceController;
 use DRELinkedData\Dataset\DatasetDescription;
 use DRELinkedData\Dataset\DatasetSummary;
+use DRELinkedData\Dataset\LandingPage;
 use DRELinkedData\Dump\ChangeTracker;
 use DRELinkedData\Dump\DumpGenerator;
 use DRELinkedData\Dump\DumpStore;
@@ -97,7 +98,12 @@ final class Factory implements FactoryInterface
                 $container->get(RdfWriter::class),
                 $container->get(DefaultSite::class),
                 $container->get('Omeka\Settings'),
-                $container->get(OmekaSource::class)
+                $container->get(LandingPage::class)
+            ),
+            LandingPage::class => new LandingPage(
+                $container->get(OmekaSource::class),
+                $container->get(DefaultSite::class),
+                $container->get(UriScheme::class)
             ),
             // The block layout is registered under its layout name.
             'dreLinkedData', LinkedDataBlock::class => new LinkedDataBlock(
@@ -109,7 +115,8 @@ final class Factory implements FactoryInterface
                 $container->get(UriScheme::class),
                 $container->get(SameAs::class),
                 static fn (): array => $container->get(DatasetSummary::class)->dataset(
-                    DatasetSettings::fromSettings($container->get('Omeka\Settings'), $container->get(DefaultSite::class)->title())
+                    DatasetSettings::fromSettings($container->get('Omeka\Settings'), $container->get(DefaultSite::class)->title()),
+                    $container->get(LandingPage::class)->url()
                 )
             ),
             default => throw new ServiceNotCreatedException(sprintf('%s cannot create %s.', self::class, $requestedName)),
