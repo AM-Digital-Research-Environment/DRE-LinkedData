@@ -5,10 +5,11 @@ namespace DRELinkedData\Rdf;
 
 use DRELinkedData\Rdf\Serializer\JsonLdSerializer;
 use DRELinkedData\Rdf\Serializer\NTriplesSerializer;
+use DRELinkedData\Rdf\Serializer\RdfXmlSerializer;
 use DRELinkedData\Rdf\Serializer\TurtleSerializer;
 
 /**
- * One entry point for all three serialisations. The prefix table is built
+ * One entry point for all four serialisations. The prefix table is built
  * lazily from Omeka's vocabulary table, so a request that 404s or redirects
  * never pays for the query.
  */
@@ -28,6 +29,7 @@ final class RdfWriter
             Format::NTriples => (new NTriplesSerializer())->serialize($triples),
             Format::Turtle => (new TurtleSerializer($this->prefixes()))->serialize($triples),
             Format::JsonLd => (new JsonLdSerializer($this->prefixes()))->serialize($triples),
+            Format::RdfXml => (new RdfXmlSerializer($this->prefixes()))->serialize($triples),
         };
     }
 

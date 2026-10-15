@@ -23,6 +23,8 @@ final class Vocab
     public const FOAF = 'http://xmlns.com/foaf/0.1/';
     public const FORMATS = 'http://www.w3.org/ns/formats/';
     public const IANA_MEDIA = 'http://www.iana.org/assignments/media-types/';
+    public const VCARD = 'http://www.w3.org/2006/vcard/ns#';
+    public const SPDX = 'http://spdx.org/rdf/terms#';
 
     public const RDF_TYPE = self::RDF . 'type';
 
@@ -40,6 +42,8 @@ final class Vocab
         'dctype' => self::DCTYPE,
         'foaf' => self::FOAF,
         'formats' => self::FORMATS,
+        'vcard' => self::VCARD,
+        'spdx' => self::SPDX,
     ];
 
     public static function iri(string $namespace, string $localName): Iri

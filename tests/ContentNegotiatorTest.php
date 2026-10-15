@@ -28,17 +28,34 @@ test('quality ties go to the server preference', function (): void {
 });
 
 test('a resource URI refuses only headers it cannot answer at all', function (): void {
-    foreach (['application/rdf+xml', 'application/rdf+xml, application/xml', 'text/turtle;q=0', 'image/png'] as $accept) {
+    foreach (['application/xml', 'application/rdf+xml;q=0, application/xml', 'text/turtle;q=0', 'image/png'] as $accept) {
         assertTrue(!ContentNegotiator::acceptable($accept), $accept . ' should be a 406');
     }
-    foreach ([null, '', 'garbage', '*/*', 'text/*', 'application/rdf+xml, text/turtle;q=0.5', 'application/rdf+xml, */*;q=0.1', 'text/html'] as $accept) {
+    foreach ([null, '', 'garbage', '*/*', 'text/*', 'application/rdf+xml', 'application/rdf+xml, */*;q=0.1', 'text/html'] as $accept) {
         assertTrue(ContentNegotiator::acceptable($accept), var_export($accept, true) . ' should be answered');
     }
-    assertSameValue(['text/html', 'text/turtle', 'application/n-triples', 'application/ld+json'], ContentNegotiator::offers());
+    assertSameValue(['text/html', 'text/turtle', 'application/n-triples', 'application/ld+json', 'application/rdf+xml'], ContentNegotiator::offers());
+});
+
+test('RDF/XML clients get RDF/XML, but Turtle wins every tie', function (): void {
+    assertSameValue(Format::RdfXml, ContentNegotiator::rdfFormat('application/rdf+xml'));
+    assertSameValue(Format::RdfXml, ContentNegotiator::rdfFormat('application/rdf+xml, text/turtle;q=0.5'));
+    assertSameValue(Format::Turtle, ContentNegotiator::rdfFormat('application/rdf+xml, text/turtle'));
+    assertSameValue(Format::NTriples, ContentNegotiator::rdfFormat('application/*'), 'a wildcard never lands on RDF/XML');
 });
 
 test('unsupported types are not acceptable', function (): void {
-    assertSameValue(null, ContentNegotiator::negotiate('application/rdf+xml', Format::mediaTypes()));
-    assertSameValue(null, ContentNegotiator::rdfFormat('application/rdf+xml'), 'falls back to the page');
+    assertSameValue(null, ContentNegotiator::negotiate('application/xml', Format::mediaTypes()));
+    assertSameValue(null, ContentNegotiator::rdfFormat('application/xml'), 'falls back to the page');
     assertSameValue(null, ContentNegotiator::negotiate('text/turtle;q=0', ['text/turtle']));
+});
+
+test('formats know their media types, content types and extensions', function (): void {
+    assertSameValue('text/turtle; charset=utf-8', Format::Turtle->contentType());
+    assertSameValue('application/n-triples', Format::NTriples->contentType(), 'no charset parameter on N-Triples');
+    assertSameValue('application/ld+json', Format::JsonLd->contentType(), 'no charset parameter on JSON-LD');
+    assertSameValue('application/rdf+xml', Format::RdfXml->contentType());
+    assertSameValue('http://www.w3.org/ns/formats/RDF_XML', Format::RdfXml->formatIri());
+    assertSameValue('ttl|nt|jsonld|rdf', Format::extensionPattern());
+    assertSameValue(Format::RdfXml, Format::fromMediaType('application/rdf+xml'));
 });
