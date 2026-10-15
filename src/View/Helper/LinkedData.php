@@ -87,7 +87,8 @@ class LinkedData extends AbstractHelper
 
     /**
      * The dataset: its IRI, VoID document, title, description, licence,
-     * publisher, figures and distributions. Built once per request.
+     * publisher, figures and distributions, and its landing page (the public
+     * page carrying the Linked open data block, or null). Built once per request.
      *
      * @return array<string,mixed>
      */

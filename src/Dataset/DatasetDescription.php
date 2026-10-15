@@ -45,9 +45,12 @@ final class DatasetDescription
      * @param array<string,mixed>|null $state the dump state ({@see \DRELinkedData\Dump\DumpStore::state()})
      * @param Format|null $format the document's own format, or null when it
      *                            was served at the negotiated, extension-less URL
+     * @param string|null $landingPage the page carrying the Linked open data
+     *                                 block ({@see LandingPage}); the homepage
+     *                                 stands in when there is none
      * @return Triple[]
      */
-    public function triples(DatasetSettings $settings, ?array $state, ?string $homepage, ?Format $format): array
+    public function triples(DatasetSettings $settings, ?array $state, ?string $homepage, ?Format $format, ?string $landingPage = null): array
     {
         $triples = [];
         $add = static function (Iri $subject, string $namespace, string $local, Iri|Literal $object) use (&$triples): void {
@@ -98,7 +101,12 @@ final class DatasetDescription
         }
         if ($homepage !== null && $homepage !== '') {
             $add($dataset, Vocab::FOAF, 'homepage', new Iri($homepage));
-            $add($dataset, Vocab::DCAT, 'landingPage', new Iri($homepage));
+        }
+        // The dataset's own page, where its figures, dump and URIs are
+        // explained, is what a catalogue should link to, not the site's home.
+        $landing = $landingPage !== null && $landingPage !== '' ? $landingPage : $homepage;
+        if ($landing !== null && $landing !== '') {
+            $add($dataset, Vocab::DCAT, 'landingPage', new Iri($landing));
         }
 
         $add($dataset, Vocab::VOID, 'uriSpace', new Literal($this->uris->resourceSpace()));

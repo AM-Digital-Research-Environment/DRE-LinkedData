@@ -4,8 +4,8 @@ declare(strict_types=1);
 namespace DRELinkedData\Controller;
 
 use DRELinkedData\Dataset\DatasetDescription;
+use DRELinkedData\Dataset\LandingPage;
 use DRELinkedData\Dump\DumpStore;
-use DRELinkedData\Projection\OmekaSource;
 use DRELinkedData\Projection\UriScheme;
 use DRELinkedData\Rdf\ContentNegotiator;
 use DRELinkedData\Rdf\Format;
@@ -30,7 +30,7 @@ use Omeka\Settings\Settings;
  */
 class DatasetController extends AbstractRdfController
 {
-    public const BLOCK_LAYOUT = 'dreLinkedData';
+    public const BLOCK_LAYOUT = LandingPage::BLOCK_LAYOUT;
 
     public function __construct(
         private readonly DatasetDescription $description,
@@ -39,7 +39,7 @@ class DatasetController extends AbstractRdfController
         private readonly RdfWriter $writer,
         private readonly DefaultSite $site,
         private readonly Settings $settings,
-        private readonly OmekaSource $source,
+        private readonly LandingPage $landingPage,
     ) {
     }
 
@@ -52,7 +52,7 @@ class DatasetController extends AbstractRdfController
             $offers = Format::mediaTypes();
             // Only a client that names HTML can prefer it; RDF clients never
             // pay for the page lookup.
-            $page = $accept !== null && stripos($accept, 'html') !== false ? $this->linkedDataPage() : null;
+            $page = $accept !== null && stripos($accept, 'html') !== false ? $this->landingPage->url() : null;
             if ($page !== null) {
                 $offers[] = ContentNegotiator::HTML;
             }
@@ -77,7 +77,8 @@ class DatasetController extends AbstractRdfController
             DatasetSettings::fromSettings($this->settings, $this->site->title()),
             $state,
             $homepage,
-            $negotiated ? null : $format
+            $negotiated ? null : $format,
+            $this->landingPage->url()
         );
 
         return $this->rdf(
@@ -145,15 +146,4 @@ class DatasetController extends AbstractRdfController
         return $response;
     }
 
-    /** The public page carrying the Linked open data block, on the default site first. */
-    private function linkedDataPage(): ?string
-    {
-        try {
-            $siteId = $this->site->get()?->id();
-            $pages = $this->source->pagesWithBlock(self::BLOCK_LAYOUT, $siteId !== null ? (int) $siteId : null);
-        } catch (\Throwable) {
-            return null;
-        }
-        return $pages ? $this->uris->sitePage($pages[0]['site_slug'], $pages[0]['page_slug']) : null;
-    }
 }

@@ -607,7 +607,7 @@ try {
     smokeAssert($linked['downloads'][0] === ['label' => 'Turtle', 'type' => 'text/turtle', 'url' => $base . '/resource/7.ttl'], 'Turtle download entry.');
     smokeAssert($helper() === $helper, 'dreLinkedData() without a resource returns the helper.');
     $dataset = $helper()->dataset();
-    smokeAssert(array_keys($dataset) === ['uri', 'void', 'title', 'description', 'licence', 'publisher', 'modified', 'triples', 'entities', 'distributions'], 'dataset() keys: ' . json_encode(array_keys($dataset)));
+    smokeAssert(array_keys($dataset) === ['uri', 'void', 'landingPage', 'title', 'description', 'licence', 'publisher', 'modified', 'triples', 'entities', 'distributions'], 'dataset() keys: ' . json_encode(array_keys($dataset)));
     smokeAssert($dataset['uri'] === $base . '/linked-data/void#dataset' && $dataset['title'] === 'AMIRA Smoke' && $dataset['triples'] === $state['triples'], 'dataset(): ' . json_encode($dataset));
     smokeAssert($dataset['distributions'][0]['bytes'] === $state['bytes'] && $dataset['distributions'][0]['encoding'] === 'application/gzip', 'dataset() distribution.');
 

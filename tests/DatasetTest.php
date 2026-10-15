@@ -184,6 +184,18 @@ test('a contact email must be an address', function (): void {
     assertTrue(!in_array(DatasetSettings::CHANGES, DatasetSettings::KEYS, true), 'the form must never overwrite the change record');
 });
 
+test('the landing page is the Linked open data page, the homepage only without one', function (): void {
+    $settings = new DatasetSettings('AMIRA', 'About.', 'Africa Multiple', null, null);
+    $page = FIXTURE_BASE . '/s/amira/page/linked-open-data';
+    $dataset = '<' . FIXTURE_BASE . '/linked-data/void#dataset>';
+    $with = (new NTriplesSerializer())->serialize(description()->triples($settings, sampleState(), FIXTURE_BASE . '/s/amira', Format::Turtle, $page));
+    assertContainsText($dataset . ' <http://www.w3.org/ns/dcat#landingPage> <' . $page . '> .', $with);
+    assertContainsText($dataset . ' <http://xmlns.com/foaf/0.1/homepage> <' . FIXTURE_BASE . '/s/amira> .', $with);
+    if (str_contains($with, '<http://www.w3.org/ns/dcat#landingPage> <' . FIXTURE_BASE . '/s/amira>')) {
+        throw new RuntimeException('The homepage must not also be a landing page when the block page exists.');
+    }
+});
+
 test('dataset() follows the helper contract', function (): void {
     $dir = tempDirectory('dataset');
     try {
@@ -192,7 +204,9 @@ test('dataset() follows the helper contract', function (): void {
         $settings = new DatasetSettings('AMIRA', 'About.', 'Africa Multiple', 'http://www.wikidata.org/entity/Q141717295', 'https://creativecommons.org/publicdomain/zero/1.0/');
 
         $before = $summary->dataset($settings);
-        assertSameValue(['uri', 'void', 'title', 'description', 'licence', 'publisher', 'modified', 'triples', 'entities', 'distributions'], array_keys($before));
+        assertSameValue(['uri', 'void', 'landingPage', 'title', 'description', 'licence', 'publisher', 'modified', 'triples', 'entities', 'distributions'], array_keys($before));
+        assertSameValue(null, $before['landingPage']);
+        assertSameValue(FIXTURE_BASE . '/s/amira/page/linked-open-data', $summary->dataset($settings, FIXTURE_BASE . '/s/amira/page/linked-open-data')['landingPage']);
         assertSameValue(FIXTURE_BASE . '/linked-data/void#dataset', $before['uri']);
         assertSameValue(FIXTURE_BASE . '/linked-data/void', $before['void']);
         assertSameValue(['name' => 'Africa Multiple', 'uri' => 'http://www.wikidata.org/entity/Q141717295'], $before['publisher']);
