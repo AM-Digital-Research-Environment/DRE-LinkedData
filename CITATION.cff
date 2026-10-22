@@ -11,9 +11,10 @@ abstract: >-
   become typed XSD literals, and Wikidata, GND and Library of Congress
   identifiers become owl:sameAs or skos:exactMatch links. An admin-triggered job
   writes the whole public graph as gzipped N-Triples for loading into a
-  triplestore such as Apache Jena Fuseki, a VoID and DCAT description documents
-  the dataset and its linksets, and a page block presents it to visitors. Built
-  for the Africa Multiple Cluster of Excellence Digital Research Environment.
+  triplestore such as Apache Jena Fuseki or Oxigraph, a VoID and DCAT description
+  documents the dataset, its linksets and any SPARQL endpoint loaded from it,
+  and a page block presents it to visitors. Built for the Africa Multiple
+  Cluster of Excellence Digital Research Environment.
 type: software
 authors:
   - family-names: Madore
@@ -24,8 +25,8 @@ authors:
 repository-code: "https://github.com/AM-Digital-Research-Environment/DRE-LinkedData"
 url: "https://github.com/AM-Digital-Research-Environment/DRE-LinkedData"
 license: GPL-3.0-or-later
-version: 0.3.1
-date-released: "2026-10-15"
+version: 0.4.0
+date-released: "2026-10-22"
 keywords:
   - Omeka S
   - Linked Open Data
@@ -36,6 +37,7 @@ keywords:
   - JSON-LD
   - RDF/XML
   - VoID
+  - SPARQL
   - DCAT
   - Wikidata
   - Apache Jena Fuseki
