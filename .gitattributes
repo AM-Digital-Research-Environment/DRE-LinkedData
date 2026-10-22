@@ -18,17 +18,22 @@
 # `git archive --prefix=DRELinkedData/` (see .github/workflows/release.yml)
 # builds the installable module zip and honours every `export-ignore` below.
 # What ships is exactly what Omeka needs at runtime — Module.php, config/, src/,
-# view/, asset/, composer.json — plus README, LICENSE and CHANGELOG for whoever
-# unpacks it. Everything else is repository furniture and stays out.
+# view/, asset/, composer.json, and scripts/generate-dump.php for cron — plus
+# README, LICENSE and CHANGELOG for whoever unpacks it. Everything else is
+# repository furniture and stays out. generate-dump.php is safe to ship: it
+# refuses to run outside the CLI, and a module's files outside asset/ are not
+# web-served anyway.
 #
 # Consequence worth knowing: `composer check` does NOT run inside an unpacked
-# release, because tests/ and scripts/ are excluded by design. Run it from a clone.
+# release, because tests/ and the token lint in scripts/ are excluded by
+# design. Run it from a clone.
 # ---------------------------------------------------------------------------
 /.gitattributes  export-ignore
 /.gitignore      export-ignore
 /.github         export-ignore
 /tests           export-ignore
-/scripts         export-ignore
+/scripts/lib                    export-ignore
+/scripts/check-design-tokens.mjs export-ignore
 /CITATION.cff    export-ignore
 /CONTRIBUTING.md export-ignore
 /SECURITY.md     export-ignore

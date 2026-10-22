@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The release archive now includes `scripts/generate-dump.php`. It was left out with the rest
+  of `scripts/`, so the documented cron command failed with "Could not open input file" on
+  every installed copy since 0.3.0. The design-token lint in `scripts/` stays out of the
+  archive.
+
 ## [0.5.0] — 2026-10-22
 
 ### Added

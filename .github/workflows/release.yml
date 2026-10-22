@@ -97,7 +97,7 @@ jobs:
           contents="$(unzip -Z1 DRELinkedData.zip)"
           fail=0
 
-          for required in DRELinkedData/Module.php DRELinkedData/config/module.ini DRELinkedData/composer.json DRELinkedData/LICENSE; do
+          for required in DRELinkedData/Module.php DRELinkedData/config/module.ini DRELinkedData/composer.json DRELinkedData/LICENSE DRELinkedData/scripts/generate-dump.php; do
             if ! grep -qxF "$required" <<< "$contents"; then
               echo "::error::${required} is missing from the archive"
               fail=1
@@ -105,9 +105,10 @@ jobs:
           done
 
           # export-ignore regressions are silent otherwise — the zip just quietly grows.
-          if grep -qE '^DRELinkedData/(tests/|scripts/|\.github/|\.git)' <<< "$contents"; then
+          # scripts/ ships generate-dump.php only; the token lint stays out.
+          if grep -qE '^DRELinkedData/(tests/|scripts/(lib/|check-design-tokens)|\.github/|\.git)' <<< "$contents"; then
             echo "::error::development files leaked into the archive:"
-            grep -E '^DRELinkedData/(tests/|scripts/|\.github/|\.git)' <<< "$contents"
+            grep -E '^DRELinkedData/(tests/|scripts/(lib/|check-design-tokens)|\.github/|\.git)' <<< "$contents"
             fail=1
           fi
 
