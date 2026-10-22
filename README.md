@@ -231,7 +231,9 @@ dump, so compare that rather than the file's timestamp. Then put the endpoint's 
 address in the **SPARQL endpoint** setting. The
 [omeka-s-docker](https://github.com/AM-Digital-Research-Environment/omeka-s-docker) template
 ships one as an opt-in service: Oxigraph, read-only, with no network of its own, reloaded
-automatically (`deploy/amira/README.md`, "SPARQL endpoint").
+automatically (`deploy/amira/README.md`, "SPARQL endpoint"). Having no network, it cannot
+run federated queries: a `SERVICE` clause fails. Wikidata's query service can still reach
+it the other way, from its side, once the endpoint is on its federation allowlist.
 
 ## Dataset description (VoID / DCAT)
 
@@ -269,15 +271,27 @@ Add **Linked open data** to a site page (a "Data access" page, say). It shows:
 - the download, with its checksum;
 - the VoID links;
 - how resource URIs work, with a worked example and a `curl` line;
-- with a SPARQL endpoint configured, the endpoint and an example query to run;
+- with a SPARQL endpoint configured, a query form: the endpoint, five example queries to
+  start from (resources by class, the most frequent subjects and places, people with an
+  ORCID iD, resources linked to Wikidata), a query editor, and the results as a table, with
+  CSV and JSON downloads;
 - the linksets and the vocabulary list.
 
 Before the first dump it says so, and still explains the per-resource route, which already
 works. Editors can set a heading and pick the example resource.
 
+The query form works without JavaScript: it sends the query to the endpoint with GET and the
+browser shows the raw results. `asset/js/dre-linked-data.js` runs it in place instead. It
+POSTs the query, draws the first 500 rows (the downloads carry them all), turns `http(s)`
+IRIs into links, and follows the DRE asynchronous-state contract (DRE-theme
+`docs/DESIGN-INTEGRATION.md`): one persistent `role="status"` node, `aria-busy` only while a
+query runs, *Loading…*, an error with *Try again*, and a quiet message with no retry when the
+endpoint is unavailable. Technical detail goes to the console, except the endpoint's own
+message about a query it rejected, which is how a visitor finds the mistake.
+
 The block is built entirely on the DRE theme's design tokens. It uses colour, type,
-spacing, radius and motion tokens and reuses the theme's own `.button`, `pre` and table
-styles. Every `var()` fallback is the theme's own value, so it reads correctly in light and
+spacing, radius and motion tokens and reuses the theme's own `.button`, `.btn--secondary`,
+field, `pre` and table styles. Every `var()` fallback is the theme's own value, so it reads correctly in light and
 dark mode. It lays out by container query from 320px up. `composer lint:tokens` holds it to
 the shared rule set vendored from DRE-theme.
 
@@ -396,6 +410,7 @@ src/Site/BlockLayout/           the "Linked open data" page block
 src/View/Helper/LinkedData.php  dreLinkedData($resource) / dreLinkedData()->dataset()
 view/                           block template and admin status panel
 asset/css/dre-linked-data.css   the block's styles, on the theme's tokens
+asset/js/dre-linked-data.js     runs the block's SPARQL form in place
 scripts/generate-dump.php       the dump from the command line or cron
 scripts/                        design-token lint (rules + table vendored from DRE-theme)
 tests/                          unit harness, fixtures, Omeka 4.2.1 integration smoke test

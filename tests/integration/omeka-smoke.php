@@ -712,7 +712,7 @@ try {
         'heading' => 'Linked open data',
         'summary' => $services->get(DatasetSummary::class)->build(DatasetSettings::fromSettings(new SmokeSettings([DatasetSettings::SPARQL_ENDPOINT => $base . '/sparql']), 'AMIRA Smoke')),
     ]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    foreach (['Query with SPARQL', 'GROUP BY ?class', 'href="' . $base . '/sparql?query=SELECT%20%3Fclass'] as $expected) {
+    foreach (['Query with SPARQL', 'GROUP BY ?class', 'action="' . $base . '/sparql"', 'name="query"', 'data-dre-ld-sparql', 'People with an ORCID iD', 'PREFIX foaf: <http://xmlns.com/foaf/0.1/>', '"loading":"Loading…"', 'btn--secondary', 'Download data (CSV)', 'role="status" aria-live="polite" aria-atomic="true"'] as $expected) {
         smokeAssert(str_contains($withSparql, $expected), "The block with an endpoint lacks: {$expected}");
     }
     $status = html_entity_decode($renderer->render('dre-linked-data/admin/status', [

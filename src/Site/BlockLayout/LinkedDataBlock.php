@@ -63,6 +63,8 @@ class LinkedDataBlock extends AbstractBlockLayout implements TemplateableBlockLa
     public function prepareRender(PhpRenderer $view)
     {
         $view->headLink()->appendStylesheet($view->assetUrl('css/dre-linked-data.css', 'DRELinkedData'));
+        // Runs the SPARQL form in place; does nothing without an endpoint.
+        $view->headScript()->appendFile($view->assetUrl('js/dre-linked-data.js', 'DRELinkedData'), 'text/javascript', ['defer' => 'defer']);
     }
 
     public function render(

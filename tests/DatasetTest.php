@@ -223,6 +223,20 @@ test('the page block offers the SPARQL endpoint with a runnable example', functi
         parse_str((string) parse_url($sparql['url'], PHP_URL_QUERY), $query);
         assertSameValue(DatasetSummary::EXAMPLE_QUERY, $query['query'] ?? null, 'the link must carry the query intact');
 
+        assertSameValue(count(DatasetSummary::EXAMPLE_QUERIES), count($sparql['examples']));
+        assertSameValue(DatasetSummary::EXAMPLE_QUERY, $sparql['examples'][0]['query'], 'the default example comes first');
+        assertSameValue($sparql['url'], $sparql['examples'][0]['url']);
+        foreach ($sparql['examples'] as $example) {
+            assertSameValue(['label', 'query', 'url'], array_keys($example));
+            parse_str((string) parse_url($example['url'], PHP_URL_QUERY), $query);
+            assertSameValue($example['query'], $query['query'] ?? null, $example['label']);
+            // Each example runs as copied: every prefix it uses is declared.
+            preg_match_all('/(?<![\w?<])([a-z]+):\w/', preg_replace('/<[^>]*>|"[^"]*"/', '', $example['query']), $used);
+            foreach (array_unique($used[1]) as $prefix) {
+                assertTrue(str_contains($example['query'], 'PREFIX ' . $prefix . ':'), $example['label'] . ' uses ' . $prefix . ': undeclared');
+            }
+        }
+
         $withQuery = $summary->build(new DatasetSettings('AMIRA', '', '', null, null, null, 'https://data.example.org/sparql?dataset=amira'))['sparql'];
         assertTrue(str_starts_with($withQuery['url'], 'https://data.example.org/sparql?dataset=amira&query='), $withQuery['url']);
     } finally {

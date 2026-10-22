@@ -170,16 +170,55 @@ $stats = [
         </section>
     </div>
 
-    <?php if (!empty($summary['sparql'])): ?>
-    <section class="dre-ld__panel" aria-labelledby="<?php echo $escapeAttr($blockId . '-sparql'); ?>">
+    <?php if (!empty($summary['sparql'])):
+        $sparql = $summary['sparql'];
+        // Strings for asset/js/dre-linked-data.js, which runs the form in place.
+        // Loading, Try again and the download labels are the shared DRE
+        // wording (DRE-theme docs/DESIGN-INTEGRATION.md, "Wording glossary").
+        $sparqlLabels = [
+            'loading' => $translate('Loading…'),
+            'retry' => $translate('Try again'),
+            'results' => $translate('{count} results in {seconds} s.'),
+            'truncated' => $translate('Showing the first {shown} of {count} results. Download them all as CSV or JSON.'),
+            'empty' => $translate('No results match this query.'),
+            'true' => $translate('Yes: the pattern matches.'),
+            'false' => $translate('No: the pattern does not match.'),
+            'graph' => $translate('The query returned a graph, shown as Turtle.'),
+            'invalid' => $translate('The endpoint could not run this query:'),
+            'busy' => $translate('Too many queries at once. Wait a moment and try again.'),
+            'unavailable' => $translate('The SPARQL endpoint is temporarily unavailable.'),
+            'incomplete' => $translate('The results were cut short, perhaps because the query took too long. Add a LIMIT, or download the results instead.'),
+            'error' => $translate('The query could not be run.'),
+        ];
+    ?>
+    <section class="dre-ld__panel dre-ld__sparql" aria-labelledby="<?php echo $escapeAttr($blockId . '-sparql'); ?>" data-dre-ld-sparql data-labels="<?php echo $escapeAttr((string) json_encode($sparqlLabels, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)); ?>">
         <<?php echo $sub; ?> class="dre-ld__panel-title" id="<?php echo $escapeAttr($blockId . '-sparql'); ?>"><?php echo $escape($translate('Query with SPARQL')); ?></<?php echo $sub; ?>>
         <p class="dre-ld__text"><?php echo $escape($translate('The same graph can be queried directly at a read-only SPARQL endpoint, loaded from the dump:')); ?></p>
-        <p class="dre-ld__pattern"><code><?php echo $escape($summary['sparql']['endpoint']); ?></code></p>
-        <p class="dre-ld__text"><?php echo $escape($translate('Send a query with GET or POST, following the SPARQL 1.1 Protocol. The Accept header chooses JSON, XML, CSV or TSV results. For example, the kinds of resources the dataset describes and how many there are of each:')); ?></p>
-        <pre class="dre-ld__code"><code><?php echo $escape($summary['sparql']['query']); ?></code></pre>
-        <p class="dre-ld__actions">
-            <a class="button dre-ld__button" href="<?php echo $escapeAttr($summary['sparql']['url']); ?>"><?php echo $escape($translate('Run this query')); ?></a>
-        </p>
+        <p class="dre-ld__pattern"><code><?php echo $escape($sparql['endpoint']); ?></code></p>
+        <p class="dre-ld__text"><?php echo $escape($translate('Send a query with GET or POST, following the SPARQL 1.1 Protocol. The Accept header chooses JSON, XML, CSV or TSV results. Or write one below, or start from an example, and run it here:')); ?></p>
+        <form class="dre-ld__query" method="get" action="<?php echo $escapeAttr($sparql['endpoint']); ?>">
+            <?php if (count($sparql['examples']) > 1): ?>
+            <p class="dre-ld__field" hidden>
+                <label class="dre-ld__label" for="<?php echo $escapeAttr($blockId . '-example'); ?>"><?php echo $escape($translate('Example')); ?></label>
+                <select class="dre-ld__select" id="<?php echo $escapeAttr($blockId . '-example'); ?>">
+                    <?php foreach ($sparql['examples'] as $example): ?>
+                    <option data-query="<?php echo $escapeAttr($example['query']); ?>"><?php echo $escape($translate($example['label'])); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </p>
+            <?php endif; ?>
+            <p class="dre-ld__field">
+                <label class="dre-ld__label" for="<?php echo $escapeAttr($blockId . '-query'); ?>"><?php echo $escape($translate('Query')); ?></label>
+                <textarea class="dre-ld__editor" id="<?php echo $escapeAttr($blockId . '-query'); ?>" name="query" rows="10" spellcheck="false" autocapitalize="off" autocomplete="off"><?php echo $escape($sparql['query']); ?></textarea>
+            </p>
+            <p class="dre-ld__actions">
+                <button class="button dre-ld__button" type="submit"><?php echo $escape($translate('Run this query')); ?></button>
+                <button class="btn--secondary dre-ld__button" type="button" data-download="text/csv" hidden><?php echo $escape($translate('Download data (CSV)')); ?></button>
+                <button class="btn--secondary dre-ld__button" type="button" data-download="application/sparql-results+json" hidden><?php echo $escape($translate('Download data (JSON)')); ?></button>
+            </p>
+        </form>
+        <p class="dre-ld__status" role="status" aria-live="polite" aria-atomic="true"></p>
+        <div class="dre-ld__results" role="region" aria-label="<?php echo $escapeAttr($translate('Query results')); ?>" aria-busy="false" hidden></div>
     </section>
     <?php endif; ?>
 
