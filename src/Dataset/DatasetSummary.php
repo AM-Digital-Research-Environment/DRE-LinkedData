@@ -29,6 +29,86 @@ final class DatasetSummary
         SPARQL;
 
     /**
+     * The examples the page block offers, the first shown by default. Each
+     * declares its own prefixes so it runs as copied, and each reads only what
+     * the projection always writes (classes, labels, subject and place links,
+     * owl:sameAs identity links).
+     *
+     * @var list<array{label:string,query:string}>
+     */
+    public const EXAMPLE_QUERIES = [
+        [
+            'label' => 'Resources by class', // @translate
+            'query' => self::EXAMPLE_QUERY,
+        ],
+        [
+            'label' => 'Most frequent subjects', // @translate
+            'query' => <<<'SPARQL'
+                PREFIX dcterms: <http://purl.org/dc/terms/>
+                PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+
+                SELECT ?subject ?label (COUNT(?record) AS ?records)
+                WHERE {
+                  ?record dcterms:subject ?subject .
+                  ?subject skos:prefLabel ?label .
+                }
+                GROUP BY ?subject ?label
+                ORDER BY DESC(?records)
+                LIMIT 25
+                SPARQL,
+        ],
+        [
+            'label' => 'Most frequent places', // @translate
+            'query' => <<<'SPARQL'
+                PREFIX dcterms: <http://purl.org/dc/terms/>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+                SELECT ?place ?label (COUNT(?record) AS ?records)
+                WHERE {
+                  ?record dcterms:spatial ?place .
+                  ?place rdfs:label ?label .
+                }
+                GROUP BY ?place ?label
+                ORDER BY DESC(?records)
+                LIMIT 25
+                SPARQL,
+        ],
+        [
+            'label' => 'People with an ORCID iD', // @translate
+            'query' => <<<'SPARQL'
+                PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+                PREFIX owl: <http://www.w3.org/2002/07/owl#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+                SELECT ?person ?name ?orcid
+                WHERE {
+                  ?person a foaf:Person ;
+                    rdfs:label ?name ;
+                    owl:sameAs ?orcid .
+                  FILTER(STRSTARTS(STR(?orcid), "https://orcid.org/"))
+                }
+                ORDER BY ?name
+                LIMIT 100
+                SPARQL,
+        ],
+        [
+            'label' => 'Resources linked to Wikidata', // @translate
+            'query' => <<<'SPARQL'
+                PREFIX owl: <http://www.w3.org/2002/07/owl#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+                SELECT ?resource ?label ?wikidata
+                WHERE {
+                  ?resource owl:sameAs ?wikidata ;
+                    rdfs:label ?label .
+                  FILTER(STRSTARTS(STR(?wikidata), "http://www.wikidata.org/entity/"))
+                }
+                LIMIT 100
+                SPARQL,
+        ],
+    ];
+
+    /**
      * @param \Closure():PrefixMap $prefixes
      * @param (\Closure(int):bool)|null $isVisible whether a resource id is public
      */
@@ -154,14 +234,19 @@ final class DatasetSummary
             'example' => $example,
             'linksets' => $linksets,
             'vocabularies' => $vocabularies,
-            // ['endpoint', 'query', 'url'] when an endpoint is configured; the
-            // url runs the example query with GET.
+            // ['endpoint', 'query', 'url', 'examples'] when an endpoint is
+            // configured: the default example, the URL that runs it with GET,
+            // and every example as ['label', 'query', 'url'].
             'sparql' => $settings->sparqlEndpoint !== null ? [
                 'endpoint' => $settings->sparqlEndpoint,
                 'query' => self::EXAMPLE_QUERY,
-                'url' => $settings->sparqlEndpoint
-                    . (str_contains($settings->sparqlEndpoint, '?') ? '&' : '?')
-                    . 'query=' . rawurlencode(self::EXAMPLE_QUERY),
+                'url' => self::queryUrl($settings->sparqlEndpoint, self::EXAMPLE_QUERY),
+                'examples' => array_map(
+                    static fn (array $example): array => $example + [
+                        'url' => self::queryUrl((string) $settings->sparqlEndpoint, $example['query']),
+                    ],
+                    self::EXAMPLE_QUERIES
+                ),
             ] : null,
             // ['since' => ISO date, 'count' => n] when the data changed after
             // the dump was taken; null when it is up to date (or never made).
@@ -173,6 +258,12 @@ final class DatasetSummary
      * "CC0 1.0", "CC BY 4.0", … for Creative Commons licence URIs; anything
      * else is shown as its URI.
      */
+    /** The URL that runs $query at $endpoint with GET (SPARQL 1.1 Protocol). */
+    public static function queryUrl(string $endpoint, string $query): string
+    {
+        return $endpoint . (str_contains($endpoint, '?') ? '&' : '?') . 'query=' . rawurlencode($query);
+    }
+
     public static function licenceLabel(string $uri): string
     {
         if (preg_match('~^https?://creativecommons\.org/publicdomain/zero/([\d.]+)/?$~i', $uri, $match)) {

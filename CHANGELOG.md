@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The *Linked open data* block's SPARQL panel is now a query form. Five example queries to
+  start from (resources by class, the most frequent subjects and places, people with an
+  ORCID iD, resources linked to Wikidata), each declaring its own prefixes; a query editor;
+  and, with JavaScript, the results drawn in place as a table (the first 500 rows), with
+  CSV and JSON downloads. Without JavaScript the form sends the query to the endpoint with
+  GET, as the old link did.
+- `asset/js/dre-linked-data.js`, which runs it. It follows the DRE asynchronous-state
+  contract (one persistent status node, `aria-busy`, *Loading…*, *Try again*, a quiet
+  message when the endpoint is unavailable) and the shared wording (*Download data (CSV)*).
+- `DatasetSummary::EXAMPLE_QUERIES`, and the `examples` key of the block summary's
+  `sparql` entry.
+
 ## [0.4.0] — 2026-10-22
 
 ### Added
