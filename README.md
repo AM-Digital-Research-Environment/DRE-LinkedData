@@ -437,7 +437,8 @@ matched by Omeka's own route table, item-set pages included.
 
 ## Roadmap
 
-- **Value annotations**, as RDF 1.2 triple terms once the triplestores (Fuseki, Oxigraph) and the serialisers agree.
+- **Value annotations**, as RDF 1.2 triple terms once the triplestores (Fuseki, Oxigraph)
+  and the serialisers agree.
 - **Finer classes for research items**, perhaps from their Type of Resource authority,
   instead of the `schema:CreativeWork` fallback.
 - **Wider authority coverage** in the source data (Type of Resource → DCMI Type, languages →
