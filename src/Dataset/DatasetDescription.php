@@ -24,7 +24,9 @@ use DRELinkedData\Settings\DatasetSettings;
  * are written in English. A contact point (a vCard with the configured email)
  * is stated only when an address is configured; dcterms:issued is the first
  * dump ever published, and the distribution carries its SHA-256 as an
- * spdx:Checksum, as DCAT 3 recommends.
+ * spdx:Checksum, as DCAT 3 recommends. A configured SPARQL endpoint is stated
+ * twice over: void:sparqlEndpoint for Linked Data tools, and a dcat:DataService
+ * serving the dataset for catalogues.
  *
  * The figures come from the last dump run's state, so they describe exactly
  * the file a client will download. Before the first run the description still
@@ -33,6 +35,8 @@ use DRELinkedData\Settings\DatasetSettings;
  */
 final class DatasetDescription
 {
+    private const SPARQL_PROTOCOL = 'https://www.w3.org/TR/sparql11-protocol/';
+
     /** @param string[] $keywords dcat:keyword values */
     public function __construct(
         private readonly UriScheme $uris,
@@ -112,6 +116,19 @@ final class DatasetDescription
         $add($dataset, Vocab::VOID, 'uriSpace', new Literal($this->uris->resourceSpace()));
         foreach (Format::cases() as $served) {
             $add($dataset, Vocab::VOID, 'feature', new Iri($served->formatIri()));
+        }
+
+        // The endpoint runs outside the module, so it is stated only when one
+        // is configured, and then whether or not a dump has been made yet.
+        if ($settings->sparqlEndpoint !== null) {
+            $endpoint = new Iri($settings->sparqlEndpoint);
+            $add($dataset, Vocab::VOID, 'sparqlEndpoint', $endpoint);
+            $service = $this->uris->sparqlService();
+            $add($service, Vocab::RDF, 'type', Vocab::iri(Vocab::DCAT, 'DataService'));
+            $add($service, Vocab::DCTERMS, 'title', new Literal('SPARQL endpoint', 'en'));
+            $add($service, Vocab::DCAT, 'endpointURL', $endpoint);
+            $add($service, Vocab::DCTERMS, 'conformsTo', new Iri(self::SPARQL_PROTOCOL));
+            $add($service, Vocab::DCAT, 'servesDataset', $dataset);
         }
 
         if ($state === null) {

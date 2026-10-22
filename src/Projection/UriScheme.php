@@ -15,6 +15,7 @@ use DRELinkedData\Rdf\Iri;
  *                                  item-set/{id}, media/{id}): foaf:isPrimaryTopicOf
  *   {base}/linked-data/void        the VoID/DCAT description (+ .ttl/.nt/.jsonld/.rdf)
  *   {base}/linked-data/void#dataset   the dataset itself
+ *   {base}/linked-data/void#sparql    the SPARQL endpoint, as a DCAT data service
  *   {base}/linked-data/dump.nt.gz  the full N-Triples dump
  *
  * Resource ids are Omeka's: the sync never deletes or renumbers items, so they
@@ -109,6 +110,12 @@ final class UriScheme
     public function distributionChecksum(): Iri
     {
         return new Iri($this->voidDocument() . '#dump-sha256');
+    }
+
+    /** The SPARQL endpoint as a dcat:DataService (the endpoint URL itself is configured). */
+    public function sparqlService(): Iri
+    {
+        return new Iri($this->voidDocument() . '#sparql');
     }
 
     /** The dataset's contact point (vcard:Kind). */

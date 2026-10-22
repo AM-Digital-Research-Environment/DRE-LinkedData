@@ -607,7 +607,7 @@ try {
     smokeAssert($linked['downloads'][0] === ['label' => 'Turtle', 'type' => 'text/turtle', 'url' => $base . '/resource/7.ttl'], 'Turtle download entry.');
     smokeAssert($helper() === $helper, 'dreLinkedData() without a resource returns the helper.');
     $dataset = $helper()->dataset();
-    smokeAssert(array_keys($dataset) === ['uri', 'void', 'landingPage', 'title', 'description', 'licence', 'publisher', 'modified', 'triples', 'entities', 'distributions'], 'dataset() keys: ' . json_encode(array_keys($dataset)));
+    smokeAssert(array_keys($dataset) === ['uri', 'void', 'landingPage', 'title', 'description', 'licence', 'publisher', 'modified', 'triples', 'entities', 'distributions', 'sparqlEndpoint'], 'dataset() keys: ' . json_encode(array_keys($dataset)));
     smokeAssert($dataset['uri'] === $base . '/linked-data/void#dataset' && $dataset['title'] === 'AMIRA Smoke' && $dataset['triples'] === $state['triples'], 'dataset(): ' . json_encode($dataset));
     smokeAssert($dataset['distributions'][0]['bytes'] === $state['bytes'] && $dataset['distributions'][0]['encoding'] === 'application/gzip', 'dataset() distribution.');
 
@@ -652,6 +652,8 @@ try {
     smokeAssert(!$validate([DatasetSettings::LICENCE => 'CC0']), 'A licence that is not a URI must be rejected.');
     smokeAssert($validate([DatasetSettings::CONTACT_EMAIL => 'dre@example.test']), 'A contact email was rejected.');
     smokeAssert(!$validate([DatasetSettings::CONTACT_EMAIL => 'not an address']), 'A contact email must be an address.');
+    smokeAssert($validate([DatasetSettings::SPARQL_ENDPOINT => 'https://data.africamultiple.uni-bayreuth.de/sparql']), 'A SPARQL endpoint was rejected.');
+    smokeAssert(!$validate([DatasetSettings::SPARQL_ENDPOINT => 'localhost:7878']), 'A SPARQL endpoint must be an absolute http(s) URI.');
 
     // ── The page block, rendered ──────────────────────────────────────────
     $renderer = new PhpRenderer();
@@ -703,6 +705,15 @@ try {
     $text = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     foreach (['class="dre-ld"', 'Download N-Triples', 'href="' . $base . '/linked-data/dump.nt.gz"', $base . '/resource/{id}', 'curl -L -H "Accept: text/turtle" ' . $base . '/resource/7', 'Wikidata', 'owl:sameAs', 'Dump is out of date (2 changes since', 'RDF/XML'] as $expected) {
         smokeAssert(str_contains($text, $expected), "The block lacks: {$expected}");
+    }
+    smokeAssert(!str_contains($text, 'Query with SPARQL'), 'The SPARQL panel must stay hidden without an endpoint.');
+    $withSparql = html_entity_decode($renderer->render('common/block-layout/dre-linked-data', [
+        'block' => $block,
+        'heading' => 'Linked open data',
+        'summary' => $services->get(DatasetSummary::class)->build(DatasetSettings::fromSettings(new SmokeSettings([DatasetSettings::SPARQL_ENDPOINT => $base . '/sparql']), 'AMIRA Smoke')),
+    ]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    foreach (['Query with SPARQL', 'GROUP BY ?class', 'href="' . $base . '/sparql?query=SELECT%20%3Fclass'] as $expected) {
+        smokeAssert(str_contains($withSparql, $expected), "The block with an endpoint lacks: {$expected}");
     }
     $status = html_entity_decode($renderer->render('dre-linked-data/admin/status', [
         'summary' => $summary,

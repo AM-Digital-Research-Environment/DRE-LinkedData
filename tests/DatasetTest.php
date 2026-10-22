@@ -184,6 +184,52 @@ test('a contact email must be an address', function (): void {
     assertTrue(!in_array(DatasetSettings::CHANGES, DatasetSettings::KEYS, true), 'the form must never overwrite the change record');
 });
 
+test('a configured SPARQL endpoint is advertised in VoID and DCAT, dump or not', function (): void {
+    $endpoint = 'https://data.example.org/sparql';
+    $settings = new DatasetSettings('AMIRA', '', '', null, null, null, $endpoint);
+    $dataset = '<' . FIXTURE_BASE . '/linked-data/void#dataset>';
+    $service = '<' . FIXTURE_BASE . '/linked-data/void#sparql>';
+    foreach ([sampleState(), null] as $state) {
+        $nt = (new NTriplesSerializer())->serialize(description()->triples($settings, $state, null, null));
+        assertContainsText($dataset . ' <http://rdfs.org/ns/void#sparqlEndpoint> <' . $endpoint . '> .', $nt);
+        assertContainsText($service . ' <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/ns/dcat#DataService> .', $nt);
+        assertContainsText($service . ' <http://www.w3.org/ns/dcat#endpointURL> <' . $endpoint . '> .', $nt);
+        assertContainsText($service . ' <http://www.w3.org/ns/dcat#servesDataset> ' . $dataset . ' .', $nt);
+        assertContainsText($service . ' <http://purl.org/dc/terms/conformsTo> <https://www.w3.org/TR/sparql11-protocol/> .', $nt);
+    }
+
+    $none = (new NTriplesSerializer())->serialize(description()->triples(new DatasetSettings('AMIRA', '', '', null, null), sampleState(), null, null));
+    assertNotContainsText('sparqlEndpoint', $none, 'no endpoint configured, none advertised');
+    assertNotContainsText('DataService', $none);
+});
+
+test('the SPARQL endpoint setting must be an http(s) URI', function (): void {
+    assertSameValue('https://data.example.org/sparql', DatasetSettings::fromSettings(new Settings([DatasetSettings::SPARQL_ENDPOINT => ' https://data.example.org/sparql ']), 'x')->sparqlEndpoint);
+    assertSameValue(null, DatasetSettings::fromSettings(new Settings([DatasetSettings::SPARQL_ENDPOINT => 'localhost:7878']), 'x')->sparqlEndpoint);
+    assertSameValue(null, DatasetSettings::fromSettings(new Settings(), 'x')->sparqlEndpoint);
+    assertTrue(in_array(DatasetSettings::SPARQL_ENDPOINT, DatasetSettings::KEYS, true), 'the form edits it, and uninstall deletes it');
+});
+
+test('the page block offers the SPARQL endpoint with a runnable example', function (): void {
+    $dir = tempDirectory('summary-sparql');
+    try {
+        $summary = new DatasetSummary(new DumpStore($dir), new UriScheme(FIXTURE_BASE), new IdentityLinks(moduleConfig()['projection']['identity_links']), static fn (): PrefixMap => new PrefixMap());
+        assertSameValue(null, $summary->build(new DatasetSettings('AMIRA', '', '', null, null))['sparql']);
+
+        $sparql = $summary->build(new DatasetSettings('AMIRA', '', '', null, null, null, 'https://data.example.org/sparql'))['sparql'];
+        assertSameValue('https://data.example.org/sparql', $sparql['endpoint']);
+        assertSameValue(DatasetSummary::EXAMPLE_QUERY, $sparql['query']);
+        assertTrue(str_starts_with($sparql['url'], 'https://data.example.org/sparql?query=SELECT%20'), $sparql['url']);
+        parse_str((string) parse_url($sparql['url'], PHP_URL_QUERY), $query);
+        assertSameValue(DatasetSummary::EXAMPLE_QUERY, $query['query'] ?? null, 'the link must carry the query intact');
+
+        $withQuery = $summary->build(new DatasetSettings('AMIRA', '', '', null, null, null, 'https://data.example.org/sparql?dataset=amira'))['sparql'];
+        assertTrue(str_starts_with($withQuery['url'], 'https://data.example.org/sparql?dataset=amira&query='), $withQuery['url']);
+    } finally {
+        removeDirectory($dir);
+    }
+});
+
 test('the landing page is the Linked open data page, the homepage only without one', function (): void {
     $settings = new DatasetSettings('AMIRA', 'About.', 'Africa Multiple', null, null);
     $page = FIXTURE_BASE . '/s/amira/page/linked-open-data';
@@ -204,7 +250,9 @@ test('dataset() follows the helper contract', function (): void {
         $settings = new DatasetSettings('AMIRA', 'About.', 'Africa Multiple', 'http://www.wikidata.org/entity/Q141717295', 'https://creativecommons.org/publicdomain/zero/1.0/');
 
         $before = $summary->dataset($settings);
-        assertSameValue(['uri', 'void', 'landingPage', 'title', 'description', 'licence', 'publisher', 'modified', 'triples', 'entities', 'distributions'], array_keys($before));
+        assertSameValue(['uri', 'void', 'landingPage', 'title', 'description', 'licence', 'publisher', 'modified', 'triples', 'entities', 'distributions', 'sparqlEndpoint'], array_keys($before));
+        assertSameValue(null, $before['sparqlEndpoint']);
+        assertSameValue('https://data.example.org/sparql', $summary->dataset(new DatasetSettings('AMIRA', '', '', null, null, null, 'https://data.example.org/sparql'))['sparqlEndpoint']);
         assertSameValue(null, $before['landingPage']);
         assertSameValue(FIXTURE_BASE . '/s/amira/page/linked-open-data', $summary->dataset($settings, FIXTURE_BASE . '/s/amira/page/linked-open-data')['landingPage']);
         assertSameValue(FIXTURE_BASE . '/linked-data/void#dataset', $before['uri']);

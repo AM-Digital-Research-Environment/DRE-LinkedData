@@ -23,6 +23,7 @@ final class DatasetSettings
     public const PUBLISHER_URI = 'dre_ld_publisher_uri';
     public const LICENCE = 'dre_ld_licence';
     public const CONTACT_EMAIL = 'dre_ld_contact_email';
+    public const SPARQL_ENDPOINT = 'dre_ld_sparql_endpoint';
 
     /** Changes since the last dump ({@see \DRELinkedData\Dump\ChangeTracker}). */
     public const CHANGES = 'dre_ld_changes';
@@ -35,6 +36,7 @@ final class DatasetSettings
         self::PUBLISHER_URI,
         self::LICENCE,
         self::CONTACT_EMAIL,
+        self::SPARQL_ENDPOINT,
     ];
 
     public const INTERNAL_KEYS = [
@@ -48,6 +50,8 @@ final class DatasetSettings
         public readonly ?string $publisherUri,
         public readonly ?string $licence,
         public readonly ?string $contactEmail = null,
+        /** A read-only SPARQL endpoint over the dump, run outside Omeka; null when there is none. */
+        public readonly ?string $sparqlEndpoint = null,
     ) {
     }
 
@@ -68,6 +72,7 @@ final class DatasetSettings
             $uri(self::PUBLISHER_URI),
             $uri(self::LICENCE),
             filter_var($email, FILTER_VALIDATE_EMAIL) !== false ? $email : null,
+            $uri(self::SPARQL_ENDPOINT),
         );
     }
 }
