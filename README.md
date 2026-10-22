@@ -23,13 +23,16 @@ This module publishes the same records properly:
 - **A permanent URI for every public resource** — `/resource/{id}` — that sends browsers to
   the record page and RDF clients to Turtle, N-Triples, JSON-LD or RDF/XML.
 - **A clean RDF projection** of each record, with identity links to the authorities.
-- **A full dump** as gzipped N-Triples, ready to load into Apache Jena Fuseki.
-- **A VoID/DCAT description** of the dataset for Linked Data tools and data catalogues.
-- **A "Linked open data" page block** that explains all of it to visitors, in the DRE theme.
+- **A full dump** as gzipped N-Triples, ready to load into a triplestore such as Apache Jena
+  Fuseki or Oxigraph.
+- **A VoID/DCAT description** of the dataset for Linked Data tools and data catalogues,
+  advertising a SPARQL endpoint loaded from the dump when one is configured.
+- **A "Linked open data" page block** that explains all of it to visitors, in the DRE theme,
+  and runs SPARQL queries in place.
 
 It sits in the DRE module family alongside `DRESearch`, `DRESeo` and `DreVisualizations`. It
-has no third-party Composer dependencies, creates no database tables and needs no theme
-edits.
+has no third-party Composer dependencies, creates no database tables, needs no theme edits
+and runs no triplestore of its own.
 
 ---
 
@@ -291,9 +294,9 @@ message about a query it rejected, which is how a visitor finds the mistake.
 
 The block is built entirely on the DRE theme's design tokens. It uses colour, type,
 spacing, radius and motion tokens and reuses the theme's own `.button`, `.btn--secondary`,
-field, `pre` and table styles. Every `var()` fallback is the theme's own value, so it reads correctly in light and
-dark mode. It lays out by container query from 320px up. `composer lint:tokens` holds it to
-the shared rule set vendored from DRE-theme.
+field, `pre` and table styles. Every `var()` fallback is the theme's own value, so it reads
+correctly in light and dark mode. It lays out by container query from 320px up.
+`composer lint:tokens` holds it to the shared rule set vendored from DRE-theme.
 
 When the data has changed since the dump was taken, the block says so ("Dump is out of
 date (N changes since …)"), and that every resource URI already serves the current data.
@@ -367,8 +370,10 @@ For the Docker deployment, add the release URL to `deploy/amira/modules.txt` in
 `omeka-s-docker`. The dump lives under `files/`, which is already a persistent, writable
 volume, so no new volume is needed. One web-server change is required for `/.well-known/void`
 only. The stock `nginx.conf` denies every dot-path (`location ~ /\.`), so it needs an
-exception for `/.well-known/` placed before that rule. Every other route reaches Omeka
-through the existing `try_files … /index.php`.
+exact-match `location = /.well-known/void` handing the request to `/index.php`, which wins
+over that regex and opens nothing else. omeka-s-docker's AMIRA overlay ships it
+(`deploy/amira/nginx-well-known-void-location.conf`). Every other route reaches Omeka through
+the existing `try_files … /index.php`.
 
 **Requirements:** Omeka S `^4.2.0`, PHP `>= 8.2` with `zlib`. CI covers PHP 8.2 and the
 production runtime, 8.5.
@@ -381,7 +386,7 @@ production runtime, 8.5.
 | Dataset title / description | For the VoID description and the page block. The title defaults to the site title. |
 | Publisher name / URI | `dcterms:publisher`. With only a name, an agent IRI is minted under `/linked-data/void#publisher`. |
 | Contact email | Optional. Published as the dataset's `dcat:contactPoint` (a vCard). Nothing is published while this is empty. |
-| SPARQL endpoint | Optional. The public address of a read-only SPARQL endpoint loaded from the dump (see [Serving it over SPARQL](#serving-it-over-sparql)). Advertised as `void:sparqlEndpoint` and a `dcat:DataService`, and offered on the page block with an example query. Nothing is advertised while this is empty. |
+| SPARQL endpoint | Optional. The public address of a read-only SPARQL endpoint loaded from the dump (see [Serving it over SPARQL](#serving-it-over-sparql)). Advertised as `void:sparqlEndpoint` and a `dcat:DataService`, and offered on the page block as a query form with example queries. Nothing is advertised while this is empty. |
 | Metadata licence | A licence URI (e.g. `https://creativecommons.org/publicdomain/zero/1.0/`), stated on every document and the dump. **Nothing is claimed while this is empty.** |
 | Generate the dump now | Starts the dump job on save. |
 
@@ -432,17 +437,19 @@ matched by Omeka's own route table, item-set pages included.
 
 ## Roadmap
 
-- **Value annotations**, as RDF 1.2 triple terms once Fuseki and the serialisers agree.
+- **Value annotations**, as RDF 1.2 triple terms once the triplestores (Fuseki, Oxigraph)
+  and the serialisers agree.
 - **Finer classes for research items**, perhaps from their Type of Resource authority,
   instead of the `schema:CreativeWork` fallback.
-- **A dereferenceable `dre:` namespace.** `http://am-digital.org/ontology/dre/` does not
-  resolve today.
 - **Wider authority coverage** in the source data (Type of Resource → DCMI Type, languages →
   ISO 639-3), which the identity links will pick up without code changes.
+- **Catalogue registration** of the dataset and its SPARQL endpoint: a Wikidata item for
+  AMIRA, the Wikidata Query Service federation allowlist, re3data and the LOD Cloud
+  ([#6](https://github.com/AM-Digital-Research-Environment/DRE-LinkedData/issues/6)).
 
 ## Uninstalling
 
-Uninstall removes the `dre_ld_*` settings (the seven on the form and the change record) and
+Uninstall removes the `dre_ld_*` settings (the eight on the form and the change record) and
 the `files/dre-linked-data/` directory.
 Remove any "Linked open data" page blocks first: Omeka keeps blocks whose layout no longer
 exists.
