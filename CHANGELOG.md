@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- An optional **SPARQL endpoint** setting. When it holds the address of a read-only endpoint
+  loaded from the dump, the VoID description states it as `void:sparqlEndpoint` and as a
+  `dcat:DataService` serving the dataset, the *Linked open data* page block adds a "Query
+  with SPARQL" panel with an example query to run, and `dreLinkedData()->dataset()` returns
+  it as `sparqlEndpoint`. Empty, the default, changes nothing. The module still runs no
+  triplestore: the endpoint is a separate service, such as the opt-in one in omeka-s-docker.
+
 ## [0.3.1] — 2026-10-15
 
 ### Changed

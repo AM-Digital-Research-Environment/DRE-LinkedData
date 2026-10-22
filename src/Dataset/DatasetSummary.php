@@ -20,6 +20,14 @@ use DRELinkedData\Settings\DatasetSettings;
  */
 final class DatasetSummary
 {
+    /** The worked example on the page block: what the dataset describes, by class. */
+    public const EXAMPLE_QUERY = <<<'SPARQL'
+        SELECT ?class (COUNT(?resource) AS ?resources)
+        WHERE { ?resource a ?class }
+        GROUP BY ?class
+        ORDER BY DESC(?resources)
+        SPARQL;
+
     /**
      * @param \Closure():PrefixMap $prefixes
      * @param (\Closure(int):bool)|null $isVisible whether a resource id is public
@@ -65,6 +73,7 @@ final class DatasetSummary
             'triples' => isset($state['triples']) ? (int) $state['triples'] : null,
             'entities' => isset($state['resources']) ? (int) array_sum((array) $state['resources']) : null,
             'distributions' => $distributions,
+            'sparqlEndpoint' => $settings->sparqlEndpoint,
         ];
     }
 
@@ -145,6 +154,15 @@ final class DatasetSummary
             'example' => $example,
             'linksets' => $linksets,
             'vocabularies' => $vocabularies,
+            // ['endpoint', 'query', 'url'] when an endpoint is configured; the
+            // url runs the example query with GET.
+            'sparql' => $settings->sparqlEndpoint !== null ? [
+                'endpoint' => $settings->sparqlEndpoint,
+                'query' => self::EXAMPLE_QUERY,
+                'url' => $settings->sparqlEndpoint
+                    . (str_contains($settings->sparqlEndpoint, '?') ? '&' : '?')
+                    . 'query=' . rawurlencode(self::EXAMPLE_QUERY),
+            ] : null,
             // ['since' => ISO date, 'count' => n] when the data changed after
             // the dump was taken; null when it is up to date (or never made).
             'changes' => $state !== null ? $this->changes?->pending($state) : null,

@@ -97,6 +97,16 @@ class ConfigForm extends Form implements InputFilterProviderInterface
         ]);
 
         $this->add([
+            'name' => DatasetSettings::SPARQL_ENDPOINT,
+            'type' => Element\Url::class,
+            'options' => [
+                'label' => 'SPARQL endpoint', // @translate
+                'info' => 'Optional. The address of a read-only SPARQL endpoint loaded from this dataset’s dump, such as https://example.org/sparql. The module does not run one: set this only once the endpoint answers. It is then advertised in the VoID/DCAT description (void:sparqlEndpoint) and offered on the Linked open data page block with an example query. Nothing is advertised while this is empty.', // @translate
+            ],
+            'attributes' => ['id' => DatasetSettings::SPARQL_ENDPOINT],
+        ]);
+
+        $this->add([
             'name' => self::REGENERATE,
             'type' => Element\Checkbox::class,
             'options' => [
@@ -140,6 +150,7 @@ class ConfigForm extends Form implements InputFilterProviderInterface
             DatasetSettings::PUBLISHER_NAME => $text(DatasetSettings::PUBLISHER_NAME),
             DatasetSettings::PUBLISHER_URI => $uri(DatasetSettings::PUBLISHER_URI),
             DatasetSettings::LICENCE => $uri(DatasetSettings::LICENCE),
+            DatasetSettings::SPARQL_ENDPOINT => $uri(DatasetSettings::SPARQL_ENDPOINT),
             DatasetSettings::CONTACT_EMAIL => [
                 'name' => DatasetSettings::CONTACT_EMAIL,
                 'required' => false,

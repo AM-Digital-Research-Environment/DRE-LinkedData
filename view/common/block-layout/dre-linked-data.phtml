@@ -170,6 +170,19 @@ $stats = [
         </section>
     </div>
 
+    <?php if (!empty($summary['sparql'])): ?>
+    <section class="dre-ld__panel" aria-labelledby="<?php echo $escapeAttr($blockId . '-sparql'); ?>">
+        <<?php echo $sub; ?> class="dre-ld__panel-title" id="<?php echo $escapeAttr($blockId . '-sparql'); ?>"><?php echo $escape($translate('Query with SPARQL')); ?></<?php echo $sub; ?>>
+        <p class="dre-ld__text"><?php echo $escape($translate('The same graph can be queried directly at a read-only SPARQL endpoint, loaded from the dump:')); ?></p>
+        <p class="dre-ld__pattern"><code><?php echo $escape($summary['sparql']['endpoint']); ?></code></p>
+        <p class="dre-ld__text"><?php echo $escape($translate('Send a query with GET or POST, following the SPARQL 1.1 Protocol. The Accept header chooses JSON, XML, CSV or TSV results. For example, the kinds of resources the dataset describes and how many there are of each:')); ?></p>
+        <pre class="dre-ld__code"><code><?php echo $escape($summary['sparql']['query']); ?></code></pre>
+        <p class="dre-ld__actions">
+            <a class="button dre-ld__button" href="<?php echo $escapeAttr($summary['sparql']['url']); ?>"><?php echo $escape($translate('Run this query')); ?></a>
+        </p>
+    </section>
+    <?php endif; ?>
+
     <?php if ($summary['linksets']): ?>
     <section class="dre-ld__panel" aria-labelledby="<?php echo $escapeAttr($blockId . '-links'); ?>">
         <<?php echo $sub; ?> class="dre-ld__panel-title" id="<?php echo $escapeAttr($blockId . '-links'); ?>"><?php echo $escape($translate('Links to other datasets')); ?></<?php echo $sub; ?>>

@@ -223,6 +223,16 @@ To load the dump into Apache Jena Fuseki (Jena reads `.gz` directly):
 tdb2.tdbloader --loc /fuseki/databases/amira amira-linked-data.nt.gz
 ```
 
+### Serving it over SPARQL
+
+The module does not run a triplestore. To offer a SPARQL endpoint, run one beside Omeka,
+load it from the dump, and reload it when `state.json` changes. Its `sha256` identifies the
+dump, so compare that rather than the file's timestamp. Then put the endpoint's public
+address in the **SPARQL endpoint** setting. The
+[omeka-s-docker](https://github.com/AM-Digital-Research-Environment/omeka-s-docker) template
+ships one as an opt-in service: Oxigraph, read-only, with no network of its own, reloaded
+automatically (`deploy/amira/README.md`, "SPARQL endpoint").
+
 ## Dataset description (VoID / DCAT)
 
 `/linked-data/void` serves Turtle by default, or the format asked for. `.ttl`, `.nt`,
@@ -238,6 +248,9 @@ description covers:
   published, carried from run to run in the dump state) and `dcterms:modified` (the latest).
 - **Contact point.** With a contact email configured, `dcat:contactPoint` a `vcard:Kind`
   with `vcard:hasEmail <mailto:…>`. Nothing is stated without one.
+- **SPARQL endpoint.** With an endpoint configured, `void:sparqlEndpoint` on the dataset,
+  and a `dcat:DataService` (`#sparql`) with its `dcat:endpointURL`, `dcat:servesDataset` the
+  dataset and `dcterms:conformsTo` the SPARQL 1.1 Protocol. Nothing is stated without one.
 - **Resolution.** The URI space (`void:uriSpace`), the supported formats, and an example
   resource (the most richly described item).
 - **Figures from the last dump.** `void:triples`, `void:entities` and the vocabularies used.
@@ -256,6 +269,7 @@ Add **Linked open data** to a site page (a "Data access" page, say). It shows:
 - the download, with its checksum;
 - the VoID links;
 - how resource URIs work, with a worked example and a `curl` line;
+- with a SPARQL endpoint configured, the endpoint and an example query to run;
 - the linksets and the vocabulary list.
 
 Before the first dump it says so, and still explains the per-resource route, which already
@@ -324,6 +338,7 @@ $this->dreLinkedData()->dataset(); // the dataset as a whole, built once per req
      ['label' => 'N-Triples dump (gzip)', 'url' => 'https://…/linked-data/dump.nt.gz',
       'type' => 'application/n-triples', 'encoding' => 'application/gzip', 'bytes' => 1911482],
   ],
+  'sparqlEndpoint' => 'https://…/sparql',  // the configured endpoint, or null (0.4.0+)
 ]
 ```
 
@@ -352,6 +367,7 @@ production runtime, 8.5.
 | Dataset title / description | For the VoID description and the page block. The title defaults to the site title. |
 | Publisher name / URI | `dcterms:publisher`. With only a name, an agent IRI is minted under `/linked-data/void#publisher`. |
 | Contact email | Optional. Published as the dataset's `dcat:contactPoint` (a vCard). Nothing is published while this is empty. |
+| SPARQL endpoint | Optional. The public address of a read-only SPARQL endpoint loaded from the dump (see [Serving it over SPARQL](#serving-it-over-sparql)). Advertised as `void:sparqlEndpoint` and a `dcat:DataService`, and offered on the page block with an example query. Nothing is advertised while this is empty. |
 | Metadata licence | A licence URI (e.g. `https://creativecommons.org/publicdomain/zero/1.0/`), stated on every document and the dump. **Nothing is claimed while this is empty.** |
 | Generate the dump now | Starts the dump job on save. |
 
@@ -401,8 +417,6 @@ matched by Omeka's own route table, item-set pages included.
 
 ## Roadmap
 
-- **SPARQL.** Load the dump into Apache Jena Fuseki and expose a read-only endpoint, then
-  advertise it with `void:sparqlEndpoint`.
 - **Value annotations**, as RDF 1.2 triple terms once Fuseki and the serialisers agree.
 - **Finer classes for research items**, perhaps from their Type of Resource authority,
   instead of the `schema:CreativeWork` fallback.
