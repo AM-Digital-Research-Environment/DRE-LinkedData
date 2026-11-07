@@ -254,16 +254,16 @@ final class DatasetSummary
         ];
     }
 
-    /**
-     * "CC0 1.0", "CC BY 4.0", … for Creative Commons licence URIs; anything
-     * else is shown as its URI.
-     */
     /** The URL that runs $query at $endpoint with GET (SPARQL 1.1 Protocol). */
     public static function queryUrl(string $endpoint, string $query): string
     {
         return $endpoint . (str_contains($endpoint, '?') ? '&' : '?') . 'query=' . rawurlencode($query);
     }
 
+    /**
+     * "CC0 1.0", "CC BY 4.0", … for Creative Commons licence URIs; anything
+     * else is shown as its URI.
+     */
     public static function licenceLabel(string $uri): string
     {
         if (preg_match('~^https?://creativecommons\.org/publicdomain/zero/([\d.]+)/?$~i', $uri, $match)) {

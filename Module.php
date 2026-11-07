@@ -158,8 +158,7 @@ class Module extends AbstractModule
         $response->setStatusCode(303);
         $headers = $response->getHeaders();
         $headers->addHeaderLine('Location', $uris->resourceDocument($id, $format));
-        $headers->addHeaderLine('Access-Control-Allow-Origin', '*');
-        $headers->addHeaderLine('Access-Control-Expose-Headers', AbstractRdfController::EXPOSED_HEADERS);
+        AbstractRdfController::cors($response);
         $this->answeredRecordPage = true;
         return $response;
     }

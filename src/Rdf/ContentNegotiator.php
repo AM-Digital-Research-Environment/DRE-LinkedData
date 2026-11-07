@@ -66,7 +66,7 @@ final class ContentNegotiator
     /**
      * Whether a resource URI can answer this Accept header at all: with the
      * record page or an RDF format. A header naming only types the module does
-     * not serve (`application/rdf+xml`) is not, and earns a 406 rather than a
+     * not serve (`application/xml`) is not, and earns a 406 rather than a
      * page the client cannot read. An absent or unparseable header accepts
      * anything (RFC 9110 §12.5.1).
      */
@@ -78,10 +78,15 @@ final class ContentNegotiator
         return self::negotiate($accept, self::offers()) !== null;
     }
 
-    /** @return string[] what a resource URI can answer with, in server preference order */
+    /**
+     * What a resource URI can answer with, in server preference order: the
+     * page, the registered RDF types, then their aliases ({@see Format::ALIASES}).
+     *
+     * @return string[]
+     */
     public static function offers(): array
     {
-        return [self::HTML, ...Format::mediaTypes()];
+        return [self::HTML, ...Format::mediaTypes(true)];
     }
 
     /** @return array<int,array{type:string,subtype:string,q:float}> */

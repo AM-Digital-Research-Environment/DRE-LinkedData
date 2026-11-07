@@ -74,14 +74,7 @@ class LinkedData extends AbstractHelper
             'uri' => $this->uris->resource($id)->value,
             'page' => $this->uris->page($id, $kind),
             'sameAs' => $this->sameAs->of($id, $template ? (int) $template->id() : null),
-            'downloads' => array_map(
-                fn (Format $format): array => [
-                    'label' => $format->label(),
-                    'type' => $format->mediaType(),
-                    'url' => $this->uris->resourceDocument($id, $format),
-                ],
-                Format::cases()
-            ),
+            'downloads' => Format::documents(fn (Format $format): string => $this->uris->resourceDocument($id, $format)),
         ];
     }
 

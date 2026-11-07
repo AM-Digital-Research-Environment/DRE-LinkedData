@@ -30,8 +30,6 @@ use Omeka\Settings\Settings;
  */
 class DatasetController extends AbstractRdfController
 {
-    public const BLOCK_LAYOUT = LandingPage::BLOCK_LAYOUT;
-
     public function __construct(
         private readonly DatasetDescription $description,
         private readonly DumpStore $store,
@@ -49,7 +47,7 @@ class DatasetController extends AbstractRdfController
         $negotiated = $extension === null || $extension === '';
         if ($negotiated) {
             $accept = $this->accept();
-            $offers = Format::mediaTypes();
+            $offers = Format::mediaTypes(true);
             // Only a client that names HTML can prefer it; RDF clients never
             // pay for the page lookup.
             $page = $accept !== null && stripos($accept, 'html') !== false ? $this->landingPage->url() : null;
@@ -124,8 +122,7 @@ class DatasetController extends AbstractRdfController
         $headers->addHeaderLine('Content-Type', 'application/gzip');
         $headers->addHeaderLine('ETag', $etag);
         $headers->addHeaderLine('Cache-Control', 'public, max-age=0, must-revalidate');
-        $headers->addHeaderLine('Access-Control-Allow-Origin', '*');
-        $headers->addHeaderLine('Access-Control-Expose-Headers', self::EXPOSED_HEADERS);
+        self::cors($response);
         $headers->addHeaderLine('Link', '<' . $this->uris->voidDocument(Format::Turtle) . '>; rel="describedby"; type="text/turtle"');
         $modified = $this->httpDate(is_string($state['generated_at'] ?? null) ? $state['generated_at'] : null);
         if ($modified !== null) {

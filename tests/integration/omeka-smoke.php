@@ -439,12 +439,16 @@ try {
     }
     $notModified = $dispatch(ResourceController::class, '/resource/7.ttl', null, ['If-None-Match' => $header($turtle, 'ETag')]);
     smokeAssert($notModified->getStatusCode() === 304, 'A matching ETag must give 304.');
+    // The document can change without the resource's own date moving (a
+    // linked resource turns private, the licence changes), so a date alone
+    // never earns a 304: only the ETag does.
     $unchangedSince = $dispatch(ResourceController::class, '/resource/7.ttl', null, ['If-Modified-Since' => 'Wed, 10 Jun 2026 00:00:00 GMT']);
-    smokeAssert($unchangedSince->getStatusCode() === 304, 'If-Modified-Since after the last change must give 304, got ' . $unchangedSince->getStatusCode());
-    $changedSince = $dispatch(ResourceController::class, '/resource/7.ttl', null, ['If-Modified-Since' => 'Mon, 01 Jun 2026 00:00:00 GMT']);
-    smokeAssert($changedSince->getStatusCode() === 200, 'If-Modified-Since before the last change must give 200.');
+    smokeAssert($unchangedSince->getStatusCode() === 200, 'If-Modified-Since alone must not give a 304, got ' . $unchangedSince->getStatusCode());
+    smokeAssert($header($unchangedSince, 'Last-Modified') !== '', 'Documents still state Last-Modified.');
     $etagWins = $dispatch(ResourceController::class, '/resource/7.ttl', null, ['If-None-Match' => '"other"', 'If-Modified-Since' => 'Wed, 10 Jun 2026 00:00:00 GMT']);
-    smokeAssert($etagWins->getStatusCode() === 200, 'If-None-Match takes precedence over If-Modified-Since.');
+    smokeAssert($etagWins->getStatusCode() === 200, 'A non-matching If-None-Match gives 200.');
+    $json = $dispatch(ResourceController::class, '/resource/7', 'application/json');
+    smokeAssert($json->getStatusCode() === 303 && $header($json, 'Location') === $base . '/resource/7.jsonld', 'A plain JSON client must be sent to the JSON-LD document, got ' . $json->getStatusCode());
     foreach (['/resource/2', '/resource/2.ttl', '/resource/5.nt', '/resource/9.jsonld'] as $hidden) {
         smokeAssert($dispatch(ResourceController::class, $hidden, 'text/turtle')->getStatusCode() === 404, "{$hidden} must be a 404.");
     }

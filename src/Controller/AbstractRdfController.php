@@ -9,7 +9,7 @@ use Laminas\Http\Response;
 use Laminas\Mvc\Controller\AbstractActionController;
 
 /**
- * Response plumbing shared by the public endpoints: RDF bodies with validators,
+ * Response plumbing shared by the public endpoints: RDF bodies with an ETag,
  * Link headers and CORS, 303 redirects for content negotiation, and bare 404s.
  *
  * CORS is open (`*`) on every response, errors and redirects included, because
@@ -50,7 +50,7 @@ abstract class AbstractRdfController extends AbstractActionController
         $headers->addHeaderLine('Content-Type', $format->contentType());
         $headers->addHeaderLine('ETag', $etag);
         $headers->addHeaderLine('Cache-Control', 'public, max-age=300');
-        $this->cors($response);
+        self::cors($response);
         if ($negotiated) {
             $headers->addHeaderLine('Vary', 'Accept');
         }
@@ -65,7 +65,12 @@ abstract class AbstractRdfController extends AbstractActionController
         if ($modified !== null) {
             $headers->addHeaderLine('Last-Modified', $modified);
         }
-        if ($this->notModified($etag, $lastModified)) {
+        // Only the ETag decides a 304. Last-Modified is the described
+        // resource's own date (or the dump's), but a document also changes
+        // when a linked resource turns private, a media is added or a setting
+        // such as the licence changes, none of which moves that date. An
+        // If-Modified-Since 304 would then serve a stale document.
+        if ($this->matchesEtag($etag)) {
             $response->setStatusCode(304);
             return $response;
         }
@@ -99,7 +104,7 @@ abstract class AbstractRdfController extends AbstractActionController
         $headers = $response->getHeaders();
         $headers->addHeaderLine('Location', $location);
         $headers->addHeaderLine('Vary', 'Accept');
-        $this->cors($response);
+        self::cors($response);
         return $response;
     }
 
@@ -108,7 +113,7 @@ abstract class AbstractRdfController extends AbstractActionController
         $response = $this->getResponse();
         $response->setStatusCode(301);
         $response->getHeaders()->addHeaderLine('Location', $location);
-        $this->cors($response);
+        self::cors($response);
         return $response;
     }
 
@@ -124,7 +129,7 @@ abstract class AbstractRdfController extends AbstractActionController
         $headers = $response->getHeaders();
         $headers->addHeaderLine('Content-Type', 'text/plain; charset=utf-8');
         $headers->addHeaderLine('Vary', 'Accept');
-        $this->cors($response);
+        self::cors($response);
         $response->setContent("Not acceptable. Available representations:\n" . implode("\n", $offers) . "\n");
         return $response;
     }
@@ -134,12 +139,12 @@ abstract class AbstractRdfController extends AbstractActionController
         $response = $this->getResponse();
         $response->setStatusCode(404);
         $response->getHeaders()->addHeaderLine('Content-Type', 'text/plain; charset=utf-8');
-        $this->cors($response);
+        self::cors($response);
         $response->setContent("Not found.\n");
         return $response;
     }
 
-    protected function cors(Response $response): void
+    public static function cors(Response $response): void
     {
         $headers = $response->getHeaders();
         $headers->addHeaderLine('Access-Control-Allow-Origin', '*');
@@ -160,50 +165,17 @@ abstract class AbstractRdfController extends AbstractActionController
         return in_array($etag, $candidates, true) || in_array('W/' . $etag, $candidates, true) || in_array('*', $candidates, true);
     }
 
-    /**
-     * RFC 9110 §13.2.2: If-None-Match decides when present; otherwise
-     * If-Modified-Since, against the resource's last modification.
-     */
-    protected function notModified(string $etag, ?string $lastModified): bool
-    {
-        $request = $this->getRequest();
-        if (!$request instanceof HttpRequest) {
-            return false;
-        }
-        if ($request->getHeaders()->has('If-None-Match')) {
-            return $this->matchesEtag($etag);
-        }
-        try {
-            // Laminas parses the date when the header is read; a malformed one throws.
-            $header = $request->getHeaders()->get('If-Modified-Since');
-            $value = $header ? $header->getFieldValue() : null;
-        } catch (\Throwable) {
-            return false;
-        }
-        if (!is_string($value) || $lastModified === null || $lastModified === '') {
-            return false;
-        }
-        $since = strtotime($value);
-        $modified = $this->timestamp($lastModified);
-        return $since !== false && $modified !== null && $modified <= $since;
-    }
-
-    protected function httpDate(?string $value): ?string
-    {
-        $timestamp = $this->timestamp($value);
-        return $timestamp === null ? null : gmdate('D, d M Y H:i:s \G\M\T', $timestamp);
-    }
-
     /** Omeka's `Y-m-d H:i:s` columns are UTC; ISO 8601 strings carry their zone. */
-    private function timestamp(?string $value): ?int
+    protected function httpDate(?string $value): ?string
     {
         if ($value === null || $value === '') {
             return null;
         }
         try {
-            return (new \DateTimeImmutable($value, new \DateTimeZone('UTC')))->getTimestamp();
+            $timestamp = (new \DateTimeImmutable($value, new \DateTimeZone('UTC')))->getTimestamp();
         } catch (\Exception) {
             return null;
         }
+        return gmdate('D, d M Y H:i:s \G\M\T', $timestamp);
     }
 }
