@@ -10,7 +10,6 @@ use DRELinkedData\Rdf\Format;
 use DRELinkedData\Rdf\RdfWriter;
 use DRELinkedData\Settings\DatasetSettings;
 use Laminas\Http\Response;
-use Omeka\Settings\Settings;
 
 /**
  * The resource URIs, following the W3C "Cool URIs" 303 pattern:
@@ -33,7 +32,8 @@ class ResourceController extends AbstractRdfController
         private readonly ResourceProjector $projector,
         private readonly UriScheme $uris,
         private readonly RdfWriter $writer,
-        private readonly Settings $settings,
+        /** @var \Closure():DatasetSettings resolved only for a document, never for a 404 or a 303 */
+        private readonly \Closure $datasetSettings,
     ) {
     }
 
@@ -63,7 +63,7 @@ class ResourceController extends AbstractRdfController
         if ($format === null) {
             return $this->notFound();
         }
-        $licence = DatasetSettings::fromSettings($this->settings, '')->licence;
+        $licence = ($this->datasetSettings)()->licence;
         return $this->rdf(
             $this->writer->write($this->projector->document($description, $format, $licence), $format),
             $format,

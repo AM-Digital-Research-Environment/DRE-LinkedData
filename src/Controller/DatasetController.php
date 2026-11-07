@@ -14,7 +14,6 @@ use DRELinkedData\Service\DefaultSite;
 use DRELinkedData\Settings\DatasetSettings;
 use Laminas\Http\Response;
 use Laminas\Http\Response\Stream;
-use Omeka\Settings\Settings;
 
 /**
  * Dataset-level endpoints:
@@ -36,8 +35,9 @@ class DatasetController extends AbstractRdfController
         private readonly UriScheme $uris,
         private readonly RdfWriter $writer,
         private readonly DefaultSite $site,
-        private readonly Settings $settings,
         private readonly LandingPage $landingPage,
+        /** @var \Closure():DatasetSettings only the VoID needs them */
+        private readonly \Closure $datasetSettings,
     ) {
     }
 
@@ -72,7 +72,7 @@ class DatasetController extends AbstractRdfController
             : null;
         $state = $this->store->state();
         $triples = $this->description->triples(
-            DatasetSettings::fromSettings($this->settings, $this->site->title()),
+            ($this->datasetSettings)(),
             $state,
             $homepage,
             $negotiated ? null : $format,

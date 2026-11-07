@@ -273,7 +273,7 @@ try {
     $services->setService(DefaultSite::class, new SmokeDefaultSite(reflected(Omeka\Api\Manager::class), $settings));
 
     foreach ([OmekaSource::class, UriScheme::class, IdentityLinks::class, ResourceProjector::class, RdfWriter::class,
-        DumpStore::class, DumpGenerator::class, DatasetDescription::class, DatasetSummary::class, ChangeTracker::class, SameAs::class] as $type) {
+        DumpStore::class, DumpGenerator::class, DatasetDescription::class, DatasetSummary::class, ChangeTracker::class, SameAs::class, DatasetSettings::class] as $type) {
         smokeAssert($services->get($type) instanceof $type, sprintf('Factory failed for %s.', $type));
     }
     $factory = new Factory();

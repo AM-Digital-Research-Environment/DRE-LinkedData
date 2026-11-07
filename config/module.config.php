@@ -31,6 +31,7 @@ return [
             Service\DefaultSite::class => Service\Factory::class,
             Dump\ChangeTracker::class => Service\Factory::class,
             Projection\SameAs::class => Service\Factory::class,
+            Settings\DatasetSettings::class => Service\Factory::class,
         ],
     ],
 

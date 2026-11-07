@@ -33,7 +33,6 @@ use DRELinkedData\Dump\ChangeTracker;
 use DRELinkedData\Dump\DumpStore;
 use DRELinkedData\Projection\UriScheme;
 use DRELinkedData\Rdf\ContentNegotiator;
-use DRELinkedData\Service\DefaultSite;
 use DRELinkedData\Service\Factory;
 use DRELinkedData\Settings\DatasetSettings;
 use Laminas\EventManager\EventInterface;
@@ -308,9 +307,7 @@ class Module extends AbstractModule
         try {
             $effectiveBase = Factory::baseUri($services);
             $form->get(DatasetSettings::BASE_URI)->setAttribute('placeholder', $effectiveBase);
-            $summary = $services->get(DatasetSummary::class)->build(
-                DatasetSettings::fromSettings($settings, $services->get(DefaultSite::class)->title())
-            );
+            $summary = $services->get(DatasetSummary::class)->build($services->get(DatasetSettings::class));
             $status = $renderer->partial('dre-linked-data/admin/status', [
                 'summary' => $summary,
                 'baseUriWarnings' => self::baseUriWarnings((string) $settings->get(DatasetSettings::BASE_URI, ''), $effectiveBase),
