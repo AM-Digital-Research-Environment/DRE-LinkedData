@@ -458,10 +458,10 @@ try {
     smokeAssert($noDump->getStatusCode() === 404, 'No dump yet must be a 404.');
 
     $state = $services->get(DumpGenerator::class)->generate();
-    smokeAssert(is_array($state) && $state['resources'] === ['items' => 4, 'item_sets' => 2, 'media' => 1], 'Dump counts: ' . json_encode($state['resources'] ?? null));
+    smokeAssert($state !== null && $state->resources() === ['items' => 4, 'item_sets' => 2, 'media' => 1], 'Dump counts: ' . json_encode($state?->resources()));
     $dumpPath = $services->get(DumpStore::class)->dumpPath();
     $dumpGraph = canonicalGraph((string) gzdecode((string) file_get_contents($dumpPath)), 'ntriples');
-    smokeAssert(count($dumpGraph) === $state['triples'], 'The dump state miscounts its triples.');
+    smokeAssert(count($dumpGraph) === $state->triples, 'The dump state miscounts its triples.');
     foreach (['Secret title', 'Private working title', 'mongoId', 'resource/2>', 'resource/5>', 'internal-name'] as $leak) {
         smokeAssert(!str_contains(implode("\n", $dumpGraph), $leak), "Leaked into the dump: {$leak}");
     }
@@ -470,12 +470,12 @@ try {
     smokeAssert($dump instanceof Response\Stream && $dump->getStatusCode() === 200, 'The dump must stream.');
     smokeAssert($header($dump, 'Content-Type') === 'application/gzip', 'Wrong dump media type.');
     smokeAssert(str_contains($header($dump, 'Content-Disposition'), 'amira-linked-data.nt.gz'), 'Wrong dump filename.');
-    smokeAssert($header($dump, 'ETag') === '"' . substr($state['sha256'], 0, 32) . '"', 'The dump ETag is its checksum when the state describes it.');
+    smokeAssert($header($dump, 'ETag') === '"' . substr((string) $state->sha256, 0, 32) . '"', 'The dump ETag is its checksum when the state describes it.');
     fclose($dump->getStream());
     // Mid-swap, the state may describe another file: the ETag must not lie.
     $statePath = dirname($dumpPath) . '/state.json';
     $stateJson = (string) file_get_contents($statePath);
-    file_put_contents($statePath, json_encode(['bytes' => $state['bytes'] + 1] + $state));
+    file_put_contents($statePath, json_encode(['bytes' => $state->bytes + 1] + $state->toArray()));
     $midSwap = $dispatch(DatasetController::class, '/linked-data/dump.nt.gz');
     smokeAssert(str_starts_with($header($midSwap, 'ETag'), 'W/"'), 'A state that does not match the file must not provide the ETag.');
     fclose($midSwap->getStream());
@@ -493,10 +493,10 @@ try {
     smokeAssert(canonicalGraph($voidXml->getContent(), 'rdfxml') !== [], 'The VoID must be served as RDF/XML too.');
     $voidJsonLd = $dispatch(DatasetController::class, '/linked-data/void.jsonld');
     $voidGraph = canonicalGraph($voidTurtle->getContent(), 'turtle');
-    smokeAssert(in_array('<https://example.test/linked-data/void#dataset> <http://rdfs.org/ns/void#triples> "' . $state['triples'] . '"^^<http://www.w3.org/2001/XMLSchema#integer> .', $voidGraph, true), 'VoID lacks the triple count.');
+    smokeAssert(in_array('<https://example.test/linked-data/void#dataset> <http://rdfs.org/ns/void#triples> "' . $state->triples . '"^^<http://www.w3.org/2001/XMLSchema#integer> .', $voidGraph, true), 'VoID lacks the triple count.');
     smokeAssert(count(canonicalJsonLd($voidJsonLd->getContent())) === count($voidGraph), 'VoID JSON-LD and Turtle disagree.');
     smokeAssert(str_contains(implode("\n", $voidGraph), 'void#links-wikidata-sameAs'), 'VoID lacks the Wikidata linkset.');
-    foreach (['<http://www.w3.org/2006/vcard/ns#hasEmail> <mailto:dre@example.test>', 'spdx.org/rdf/terms#checksumValue> "' . $state['sha256'] . '"', '/dc/terms/issued>', 'dcat#keyword>'] as $expected) {
+    foreach (['<http://www.w3.org/2006/vcard/ns#hasEmail> <mailto:dre@example.test>', 'spdx.org/rdf/terms#checksumValue> "' . (string) $state->sha256 . '"', '/dc/terms/issued>', 'dcat#keyword>'] as $expected) {
         smokeAssert(str_contains(implode("\n", $voidGraph), $expected), "VoID lacks {$expected}");
     }
     $wellKnown = $dispatch(DatasetController::class, '/.well-known/void');
@@ -612,8 +612,8 @@ try {
     smokeAssert($helper() === $helper, 'dreLinkedData() without a resource returns the helper.');
     $dataset = $helper()->dataset();
     smokeAssert(array_keys($dataset) === ['uri', 'void', 'landingPage', 'title', 'description', 'licence', 'publisher', 'modified', 'triples', 'entities', 'distributions', 'sparqlEndpoint'], 'dataset() keys: ' . json_encode(array_keys($dataset)));
-    smokeAssert($dataset['uri'] === $base . '/linked-data/void#dataset' && $dataset['title'] === 'AMIRA Smoke' && $dataset['triples'] === $state['triples'], 'dataset(): ' . json_encode($dataset));
-    smokeAssert($dataset['distributions'][0]['bytes'] === $state['bytes'] && $dataset['distributions'][0]['encoding'] === 'application/gzip', 'dataset() distribution.');
+    smokeAssert($dataset['uri'] === $base . '/linked-data/void#dataset' && $dataset['title'] === 'AMIRA Smoke' && $dataset['triples'] === $state->triples, 'dataset(): ' . json_encode($dataset));
+    smokeAssert($dataset['distributions'][0]['bytes'] === $state->bytes && $dataset['distributions'][0]['encoding'] === 'application/gzip', 'dataset() distribution.');
 
     // Alternate links: on the item-set page (an item browse) and on show pages.
     $view = new PhpRenderer();

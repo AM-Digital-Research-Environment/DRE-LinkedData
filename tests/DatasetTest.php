@@ -4,6 +4,7 @@ declare(strict_types=1);
 use DRELinkedData\Dataset\DatasetDescription;
 use DRELinkedData\Dataset\DatasetSummary;
 use DRELinkedData\Dump\ChangeTracker;
+use DRELinkedData\Dump\DumpState;
 use DRELinkedData\Dump\DumpStore;
 use DRELinkedData\Projection\IdentityLinks;
 use DRELinkedData\Projection\UriScheme;
@@ -55,7 +56,7 @@ test('editorial settings fall back to the site title and reject non-http URIs', 
 
 test('the VoID description carries the dump, the counts and the linksets', function (): void {
     $settings = new DatasetSettings('AMIRA', 'Research data of the Africa Multiple Cluster.', 'University of Bayreuth', 'http://www.wikidata.org/entity/Q317070', 'https://creativecommons.org/publicdomain/zero/1.0/');
-    $nt = (new NTriplesSerializer())->serialize(description()->triples($settings, sampleState(), FIXTURE_BASE . '/s/amira', Format::Turtle));
+    $nt = (new NTriplesSerializer())->serialize(description()->triples($settings, DumpState::fromArray(sampleState()), FIXTURE_BASE . '/s/amira', Format::Turtle));
 
     $dataset = '<' . FIXTURE_BASE . '/linked-data/void#dataset>';
     $void = 'http://rdfs.org/ns/void#';
@@ -148,7 +149,7 @@ test('the summary gives templates everything they show', function (): void {
 
 test('the DCAT description has a contact point, issue date, keywords, checksum and English labels', function (): void {
     $settings = new DatasetSettings('AMIRA', 'Research data.', 'Africa Multiple Cluster of Excellence', null, 'https://creativecommons.org/publicdomain/zero/1.0/', 'dre@example.org');
-    $state = sampleState() + ['first_generated_at' => '2026-10-01T08:00:00Z'];
+    $state = DumpState::fromArray(sampleState() + ['first_generated_at' => '2026-10-01T08:00:00Z']);
     $nt = (new NTriplesSerializer())->serialize(description()->triples($settings, $state, null, null));
     $dataset = '<' . FIXTURE_BASE . '/linked-data/void#dataset>';
     $contact = '<' . FIXTURE_BASE . '/linked-data/void#contact>';
@@ -169,7 +170,7 @@ test('the DCAT description has a contact point, issue date, keywords, checksum a
     assertContainsText('<http://purl.org/dc/terms/title> "N-Triples dump (gzip)"@en .', $nt);
     assertContainsText($dataset . ' <http://rdfs.org/ns/void#feature> <http://www.w3.org/ns/formats/RDF_XML> .', $nt);
 
-    $none = (new NTriplesSerializer())->serialize(description()->triples(new DatasetSettings('AMIRA', '', '', null, null), sampleState(), null, null));
+    $none = (new NTriplesSerializer())->serialize(description()->triples(new DatasetSettings('AMIRA', '', '', null, null), DumpState::fromArray(sampleState()), null, null));
     assertNotContainsText('contactPoint', $none, 'no address, no contact point');
     assertNotContainsText('vcard', $none);
 });
@@ -189,7 +190,7 @@ test('a configured SPARQL endpoint is advertised in VoID and DCAT, dump or not',
     $settings = new DatasetSettings('AMIRA', '', '', null, null, null, $endpoint);
     $dataset = '<' . FIXTURE_BASE . '/linked-data/void#dataset>';
     $service = '<' . FIXTURE_BASE . '/linked-data/void#sparql>';
-    foreach ([sampleState(), null] as $state) {
+    foreach ([DumpState::fromArray(sampleState()), null] as $state) {
         $nt = (new NTriplesSerializer())->serialize(description()->triples($settings, $state, null, null));
         assertContainsText($dataset . ' <http://rdfs.org/ns/void#sparqlEndpoint> <' . $endpoint . '> .', $nt);
         assertContainsText($service . ' <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/ns/dcat#DataService> .', $nt);
@@ -198,7 +199,7 @@ test('a configured SPARQL endpoint is advertised in VoID and DCAT, dump or not',
         assertContainsText($service . ' <http://purl.org/dc/terms/conformsTo> <https://www.w3.org/TR/sparql11-protocol/> .', $nt);
     }
 
-    $none = (new NTriplesSerializer())->serialize(description()->triples(new DatasetSettings('AMIRA', '', '', null, null), sampleState(), null, null));
+    $none = (new NTriplesSerializer())->serialize(description()->triples(new DatasetSettings('AMIRA', '', '', null, null), DumpState::fromArray(sampleState()), null, null));
     assertNotContainsText('sparqlEndpoint', $none, 'no endpoint configured, none advertised');
     assertNotContainsText('DataService', $none);
 });
@@ -248,7 +249,7 @@ test('the landing page is the Linked open data page, the homepage only without o
     $settings = new DatasetSettings('AMIRA', 'About.', 'Africa Multiple', null, null);
     $page = FIXTURE_BASE . '/s/amira/page/linked-open-data';
     $dataset = '<' . FIXTURE_BASE . '/linked-data/void#dataset>';
-    $with = (new NTriplesSerializer())->serialize(description()->triples($settings, sampleState(), FIXTURE_BASE . '/s/amira', Format::Turtle, $page));
+    $with = (new NTriplesSerializer())->serialize(description()->triples($settings, DumpState::fromArray(sampleState()), FIXTURE_BASE . '/s/amira', Format::Turtle, $page));
     assertContainsText($dataset . ' <http://www.w3.org/ns/dcat#landingPage> <' . $page . '> .', $with);
     assertContainsText($dataset . ' <http://xmlns.com/foaf/0.1/homepage> <' . FIXTURE_BASE . '/s/amira> .', $with);
     if (str_contains($with, '<http://www.w3.org/ns/dcat#landingPage> <' . FIXTURE_BASE . '/s/amira>')) {

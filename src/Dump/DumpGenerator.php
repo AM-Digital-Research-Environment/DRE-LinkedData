@@ -38,10 +38,10 @@ final class DumpGenerator
 
     /**
      * @param (callable():bool)|null $shouldStop polled between batches; true abandons the run
-     * @return array<string,mixed>|null the published state, or null when the run
-     *                                  was stopped or another run holds the lock
+     * @return DumpState|null the published state, or null when the run was
+     *                        stopped or another run holds the lock
      */
-    public function generate(?callable $shouldStop = null): ?array
+    public function generate(?callable $shouldStop = null): ?DumpState
     {
         $lock = $this->store->lock();
         if ($lock === null) {
@@ -119,26 +119,21 @@ final class DumpGenerator
             ksort($vocabularies);
             ksort($linksets);
             $generatedAt = gmdate('Y-m-d\TH:i:s\Z');
-            $state = [
-                'version' => 2,
-                'started_at' => $startedAt,
-                'generated_at' => $generatedAt,
+            $state = new DumpState(
+                generatedAt: $generatedAt,
+                startedAt: $startedAt,
                 // When the dataset was first published (dcterms:issued), carried
                 // over from run to run.
-                'first_generated_at' => is_string($previous['first_generated_at'] ?? null)
-                    ? $previous['first_generated_at']
-                    : (is_string($previous['generated_at'] ?? null) ? $previous['generated_at'] : $generatedAt),
-                'duration_seconds' => round(microtime(true) - $started, 1),
-                'triples' => $triples,
-                'resources' => [
-                    'items' => $resources[ResourceDescription::ITEM],
-                    'item_sets' => $resources[ResourceDescription::ITEM_SET],
-                    'media' => $resources[ResourceDescription::MEDIA],
-                ],
-                'bytes' => (int) filesize($partPath),
-                'sha256' => (string) hash_file('sha256', $partPath),
-                'vocabularies' => array_keys($vocabularies),
-                'linksets' => array_map(
+                firstGeneratedAt: $previous?->firstGeneratedAt ?? $previous?->generatedAt ?? $generatedAt,
+                durationSeconds: round(microtime(true) - $started, 1),
+                triples: $triples,
+                items: $resources[ResourceDescription::ITEM],
+                itemSets: $resources[ResourceDescription::ITEM_SET],
+                media: $resources[ResourceDescription::MEDIA],
+                bytes: (int) filesize($partPath),
+                sha256: (string) hash_file('sha256', $partPath),
+                vocabularies: array_keys($vocabularies),
+                linksets: array_map(
                     static function (string $key, int $count): array {
                         [$authority, $predicate] = explode("\0", $key, 2);
                         return ['authority' => $authority, 'predicate' => $predicate, 'triples' => $count];
@@ -146,16 +141,16 @@ final class DumpGenerator
                     array_keys($linksets),
                     array_values($linksets)
                 ),
-                'example_resource' => $example,
-            ];
+                exampleResource: $example,
+            );
             $this->store->publish($partPath, $state);
             $this->changes?->settle($startedAt);
 
             $this->logger->info(sprintf(
                 'DRELinkedData: wrote %d triples for %d resources in %.1f s.',
                 $triples,
-                array_sum($resources),
-                $state['duration_seconds']
+                $state->entities(),
+                $state->durationSeconds
             ));
             return $state;
         } finally {

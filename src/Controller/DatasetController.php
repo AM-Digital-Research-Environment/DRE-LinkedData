@@ -82,7 +82,7 @@ class DatasetController extends AbstractRdfController
         return $this->rdf(
             $this->writer->write($triples, $format),
             $format,
-            is_string($state['generated_at'] ?? null) ? $state['generated_at'] : null,
+            $state?->generatedAt,
             $negotiated,
             self::documentLinks(
                 $format,
@@ -110,10 +110,11 @@ class DatasetController extends AbstractRdfController
         // The state's checksum is the ETag only when it describes the file
         // actually opened: while a new dump is swapped in, state.json and
         // dump.nt.gz are renamed one after the other.
-        $size = (int) (fstat($handle)['size'] ?? 0);
-        $mtime = (int) (fstat($handle)['mtime'] ?? 0);
-        $sha256 = (string) ($state['sha256'] ?? '');
-        $etag = $sha256 !== '' && (int) ($state['bytes'] ?? -1) === $size
+        $stat = fstat($handle) ?: [];
+        $size = (int) ($stat['size'] ?? 0);
+        $mtime = (int) ($stat['mtime'] ?? 0);
+        $sha256 = (string) $state->sha256;
+        $etag = $sha256 !== '' && $state->bytes === $size
             ? '"' . substr($sha256, 0, 32) . '"'
             : 'W/"' . dechex($size) . '-' . dechex($mtime) . '"';
 
@@ -124,7 +125,7 @@ class DatasetController extends AbstractRdfController
         $headers->addHeaderLine('Cache-Control', 'public, max-age=0, must-revalidate');
         self::cors($response);
         $headers->addHeaderLine('Link', '<' . $this->uris->voidDocument(Format::Turtle) . '>; rel="describedby"; type="text/turtle"');
-        $modified = $this->httpDate(is_string($state['generated_at'] ?? null) ? $state['generated_at'] : null);
+        $modified = $this->httpDate($state->generatedAt);
         if ($modified !== null) {
             $headers->addHeaderLine('Last-Modified', $modified);
         }

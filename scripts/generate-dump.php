@@ -85,11 +85,11 @@ try {
     if (!$quiet) {
         fwrite(STDOUT, sprintf(
             "Wrote %d triples for %d resources (%d bytes, %.1f s) at %s.\n",
-            $state['triples'],
-            array_sum($state['resources']),
-            $state['bytes'],
-            $state['duration_seconds'],
-            $state['generated_at']
+            $state->triples,
+            $state->entities(),
+            (int) $state->bytes,
+            $state->durationSeconds,
+            $state->generatedAt
         ));
     }
     exit(0);

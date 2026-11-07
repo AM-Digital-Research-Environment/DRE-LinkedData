@@ -57,9 +57,8 @@ final class DumpStore
      * The state of the published dump, or null when there is none (never
      * generated, or the state file is missing or unreadable).
      *
-     * @return array<string,mixed>|null
      */
-    public function state(): ?array
+    public function state(): ?DumpState
     {
         $path = $this->directory . '/' . self::STATE;
         if (!$this->hasDump() || !is_file($path)) {
@@ -67,7 +66,7 @@ final class DumpStore
         }
         $json = @file_get_contents($path);
         $state = is_string($json) ? json_decode($json, true) : null;
-        return is_array($state) ? $state : null;
+        return is_array($state) ? DumpState::fromArray($state) : null;
     }
 
     /**
@@ -105,14 +104,13 @@ final class DumpStore
     /**
      * Move a finished part file into place and record its state.
      *
-     * @param array<string,mixed> $state
      */
-    public function publish(string $partPath, array $state): void
+    public function publish(string $partPath, DumpState $state): void
     {
         // Everything that can fail slowly happens before the dump moves.
         $statePart = $this->directory . '/.state-' . bin2hex(random_bytes(6)) . '.part';
         $json = json_encode(
-            $state,
+            $state->toArray(),
             JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR
         );
         if (@file_put_contents($statePart, $json . "\n", LOCK_EX) === false) {
