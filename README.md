@@ -9,7 +9,7 @@
 Linked Open Data for the **Africa Multiple DRE** Omeka S instance
 ([data.africamultiple.uni-bayreuth.de](https://data.africamultiple.uni-bayreuth.de)).
 
-Omeka already returns RDF from its API (`/api/items/7392?format=turtle`), but that is the
+Omeka already returns RDF from its API (`/api/items/44460?format=turtle`), but that is the
 platform's internal model rather than publishable Linked Data:
 
 - subjects are API URLs;
@@ -39,20 +39,22 @@ and runs no triplestore of its own.
 ## Resource URIs
 
 ```
-https://data.africamultiple.uni-bayreuth.de/resource/7392          the item itself
-https://data.africamultiple.uni-bayreuth.de/resource/7392.ttl      Turtle
-https://data.africamultiple.uni-bayreuth.de/resource/7392.nt       N-Triples
-https://data.africamultiple.uni-bayreuth.de/resource/7392.jsonld   JSON-LD
-https://data.africamultiple.uni-bayreuth.de/resource/7392.rdf      RDF/XML
+https://data.africamultiple.uni-bayreuth.de/resource/44460          the item itself
+https://data.africamultiple.uni-bayreuth.de/resource/44460.ttl      Turtle
+https://data.africamultiple.uni-bayreuth.de/resource/44460.nt       N-Triples
+https://data.africamultiple.uni-bayreuth.de/resource/44460.jsonld   JSON-LD
+https://data.africamultiple.uni-bayreuth.de/resource/44460.rdf      RDF/XML
 ```
 
 `/resource/{id}` follows the W3C [Cool URIs](https://www.w3.org/TR/cooluris/) 303 pattern.
 It content-negotiates on `Accept`:
 
-- a browser is redirected to the record page, `https://…/s/amira/item/7392` (item sets go to
+- a browser is redirected to the record page, `https://…/s/amira/item/44460` (item sets go to
   `/s/amira/item-set/{id}`, media to `/s/amira/media/{id}`);
 - an RDF client is redirected to the document in the format it named. When a client accepts
-  several formats equally, Turtle wins and RDF/XML comes last;
+  several formats equally, Turtle wins and RDF/XML comes last. A client that names only
+  `application/json` gets JSON-LD, and `text/n3` or `application/x-turtle` get Turtle; these
+  aliases never win a tie against a registered RDF type;
 - a client that accepts none of these (only `application/xml`, say) gets
   `406 Not Acceptable` with the list of available types, not a page it cannot read.
 
@@ -64,8 +66,8 @@ a `303` to the resource's document, and every one of these pages advertises the 
 documents with `<link rel="alternate">`:
 
 ```bash
-curl -L -H "Accept: text/turtle" https://data.africamultiple.uni-bayreuth.de/resource/7392
-curl -L -H "Accept: application/ld+json" https://data.africamultiple.uni-bayreuth.de/s/amira/item/7392
+curl -L -H "Accept: text/turtle" https://data.africamultiple.uni-bayreuth.de/resource/44460
+curl -L -H "Accept: application/ld+json" https://data.africamultiple.uni-bayreuth.de/s/amira/item/44460
 curl -L -H "Accept: text/turtle" https://data.africamultiple.uni-bayreuth.de/s/amira/item-set/18
 ```
 
@@ -82,7 +84,9 @@ curl -L -H "Accept: text/turtle" https://data.africamultiple.uni-bayreuth.de/s/a
   `application/ld+json` and `application/rdf+xml`. N-Triples and JSON-LD are UTF-8 by
   definition and take no `charset` parameter.
 - **Caching.** `ETag`, `Last-Modified` and `Cache-Control: public, max-age=300`, with `304`
-  for a matching `If-None-Match` or, when that header is absent, for `If-Modified-Since`.
+  for a matching `If-None-Match`. `If-Modified-Since` alone never earns a `304`: a document
+  also changes when a linked resource turns private, a media is added or the licence
+  changes, none of which moves the resource's own modification date.
 - **No session.** Omeka starts the PHP session during bootstrap, before any route is known,
   so it cannot be skipped. For the module's responses (and the record pages' RDF `303`) it is
   closed without being written, and the `Set-Cookie`, `Expires: Thu, 19 Nov 1981…`,
@@ -98,7 +102,7 @@ resource. A resource that is missing or not public is a 404 on every route.
 Each document describes one resource, plus a few statements about the document itself
 (`foaf:primaryTopic`, `dcterms:modified`, `void:inDataset` and the licence, if one is set).
 The resource is `foaf:isPrimaryTopicOf` its record page on the default site
-(`https://…/s/amira/item/7392`), and that page is `dcterms:modified` when the record last
+(`https://…/s/amira/item/44460`), and that page is `dcterms:modified` when the record last
 changed. Both statements are also in the dump, so each resource there carries its own
 modification date.
 
@@ -426,6 +430,7 @@ tests/                          unit harness, fixtures, Omeka 4.2.1 integration 
 ```bash
 composer check                                     # PHP lint, design-token lint, unit tests
 OMEKA_PATH=/path/to/omeka-s composer integration   # against a real Omeka S 4.2.1
+OMEKA_PATH=/path/to/omeka-s composer analyse       # PHPStan level 6, phpstan on the PATH
 ```
 
 The integration test builds a small Omeka database in SQLite to prove the visibility SQL
@@ -434,6 +439,10 @@ dispatches the controllers through the real routes, checks their status codes an
 and parses Turtle, N-Triples, JSON-LD and RDF/XML with EasyRdf and ml/json-ld from Omeka's
 vendor tree. The four must yield the identical graph. Record-page negotiation runs on URLs
 matched by Omeka's own route table, item-set pages included.
+
+PHPStan analyses `Module.php`, `src/` and the CLI script at level 6 against the same unpacked
+Omeka S, through Omeka's own autoloader, so nothing is installed with Composer. CI runs it
+in the integration job; there is no baseline.
 
 ## Roadmap
 

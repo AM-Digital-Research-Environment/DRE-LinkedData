@@ -34,8 +34,16 @@ with the RDF libraries in Omeka's own vendor tree:
 OMEKA_PATH=/path/to/omeka-s composer integration
 ```
 
-CI runs the unit suite on PHP 8.2 and 8.5, plus the smoke test against a checksum-pinned
-Omeka S 4.2.1. Please run `composer check` before pushing.
+Static analysis runs PHPStan (level 6, no baseline) against the same unpacked Omeka S.
+Use the PHPStan phar or any global install; the module still installs nothing:
+
+```bash
+OMEKA_PATH=/path/to/omeka-s composer analyse
+```
+
+CI runs the unit suite on PHP 8.2 and 8.5, plus the smoke test and PHPStan against a
+checksum-pinned Omeka S 4.2.1. Please run `composer check` before pushing, and
+`composer analyse` when you touch `src/`, `Module.php` or `scripts/generate-dump.php`.
 
 ## Conventions
 
