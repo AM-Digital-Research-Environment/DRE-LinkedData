@@ -6,6 +6,40 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-11-07
+
+### Added
+
+- Resource URIs, record pages and `/linked-data/void` answer three common aliases instead of
+  a `406`: `application/json` gets JSON-LD, and `text/n3` and `application/x-turtle` get
+  Turtle. They are offered after the registered RDF types, so they never win a tie, and the
+  document is still served under its registered media type.
+- Static analysis: PHPStan at level 6, with no baseline, against the Omeka S 4.2.1 release the
+  CI smoke job already unpacks (`phpstan.neon.dist`, `composer analyse`). Nothing is
+  installed with Composer.
+
+### Changed
+
+- **`If-Modified-Since` alone no longer gives a `304`.** A document also changes when a
+  linked resource turns private, a media is added or the licence setting changes, none of
+  which moves the `Last-Modified` date, so a client revalidating by date alone could keep a
+  stale document. Only a matching `ETag` gives a `304` now; `Last-Modified` is still sent.
+- The resource route's action is `resource`, not `index`: an `indexAction()` returning a
+  `Response` contradicted Laminas's contract for that method.
+- The admin status panel formats its figures in the admin's locale, as the page block does.
+- `composer.json` requires `ext-mbstring`, which the serialisers use (Omeka requires it too).
+
+### Internal
+
+- The dump state is a typed `Dump\DumpState`, read leniently from `state.json` (whose shape is
+  unchanged) instead of an array every reader re-checked.
+- `ResourceProjector::project()` is split into its steps over a new `Rdf\TripleSet`; every
+  fixture resource projects to the same N-Triples, byte for byte, before and after.
+- The editorial settings are one shared `DatasetSettings` service, resolved lazily so a `404`
+  or a `303` still never pays for the site lookup.
+- `Format::documents()` builds the per-format document lists the view helper and the page
+  block share; the record-page `303` and the dump use the controllers' CORS helper.
+
 ### Fixed
 
 - The release archive now includes `scripts/generate-dump.php`. It was left out with the rest
@@ -160,7 +194,8 @@ All notable changes to this project are documented here. The format follows
 - Unit tests, an Omeka S 4.2.1 integration smoke test that parses every serialisation with
   EasyRdf and ml/json-ld, the DRE design-token lint, and CI and release workflows.
 
-[Unreleased]: https://github.com/AM-Digital-Research-Environment/DRE-LinkedData/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/AM-Digital-Research-Environment/DRE-LinkedData/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/AM-Digital-Research-Environment/DRE-LinkedData/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/AM-Digital-Research-Environment/DRE-LinkedData/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/AM-Digital-Research-Environment/DRE-LinkedData/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/AM-Digital-Research-Environment/DRE-LinkedData/compare/v0.3.0...v0.3.1
