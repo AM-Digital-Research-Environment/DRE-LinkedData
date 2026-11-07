@@ -34,7 +34,28 @@ test('a resource URI refuses only headers it cannot answer at all', function ():
     foreach ([null, '', 'garbage', '*/*', 'text/*', 'application/rdf+xml', 'application/rdf+xml, */*;q=0.1', 'text/html'] as $accept) {
         assertTrue(ContentNegotiator::acceptable($accept), var_export($accept, true) . ' should be answered');
     }
-    assertSameValue(['text/html', 'text/turtle', 'application/n-triples', 'application/ld+json', 'application/rdf+xml'], ContentNegotiator::offers());
+    assertSameValue(
+        ['text/html', 'text/turtle', 'application/n-triples', 'application/ld+json', 'application/rdf+xml', 'application/json', 'text/n3', 'application/x-turtle'],
+        ContentNegotiator::offers()
+    );
+});
+
+test('common aliases reach the format they stand for, and never win a tie', function (): void {
+    assertSameValue(Format::JsonLd, ContentNegotiator::rdfFormat('application/json'));
+    assertSameValue(Format::JsonLd, ContentNegotiator::rdfFormat('application/json, text/javascript, */*; q=0.01'), 'jQuery\'s JSON Accept');
+    assertSameValue(Format::Turtle, ContentNegotiator::rdfFormat('text/n3'));
+    assertSameValue(Format::Turtle, ContentNegotiator::rdfFormat('application/x-turtle'));
+    assertSameValue(Format::Turtle, ContentNegotiator::rdfFormat('application/json, text/turtle'), 'a registered type beats an alias');
+    assertSameValue(Format::NTriples, ContentNegotiator::rdfFormat('application/*'), 'a wildcard still lands on a registered type');
+    assertTrue(ContentNegotiator::acceptable('application/json'), 'application/json is answered, not a 406');
+    assertSameValue(Format::JsonLd, Format::fromMediaType('application/json'));
+    assertSameValue(['text/turtle', 'application/n-triples', 'application/ld+json', 'application/rdf+xml'], Format::mediaTypes(), 'aliases only on request');
+});
+
+test('every format lists its document with label, type and URL', function (): void {
+    $documents = Format::documents(static fn (Format $format): string => 'https://x.test/r.' . $format->value);
+    assertSameValue(['label' => 'JSON-LD', 'type' => 'application/ld+json', 'url' => 'https://x.test/r.jsonld'], $documents[2]);
+    assertSameValue(4, count($documents));
 });
 
 test('RDF/XML clients get RDF/XML, but Turtle wins every tie', function (): void {

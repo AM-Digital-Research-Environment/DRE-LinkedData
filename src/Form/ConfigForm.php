@@ -17,6 +17,8 @@ use Laminas\Validator\Regex;
  * token, so this only contributes fields. Every field is optional: unset, the
  * base URI follows the address Omeka is reached at and the dataset is named
  * after the site.
+ *
+ * @extends Form<array<string,mixed>>
  */
 class ConfigForm extends Form implements InputFilterProviderInterface
 {

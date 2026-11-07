@@ -6,8 +6,8 @@ namespace DRELinkedData\Projection;
 use DRELinkedData\Rdf\Format;
 use DRELinkedData\Rdf\Iri;
 use DRELinkedData\Rdf\Literal;
-use DRELinkedData\Rdf\Serializer\NTriplesSerializer;
 use DRELinkedData\Rdf\Triple;
+use DRELinkedData\Rdf\TripleSet;
 use DRELinkedData\Rdf\Vocab;
 
 /**
@@ -220,6 +220,10 @@ final class ResourceProjector
     }
 
     /**
+     * One resource's description, built in the order the statements read:
+     * types and labels, property values, lists, structure (item sets, media,
+     * files), then the record page.
+     *
      * @param array<string,mixed> $row
      * @param array<int,array<string,mixed>> $values
      * @param int[] $itemSetIds
@@ -243,20 +247,61 @@ final class ResourceProjector
         $id = (int) $row['id'];
         $subject = $this->uris->resource($id);
         $templateId = $row['resource_template_id'] !== null ? (int) $row['resource_template_id'] : null;
+        $triples = new TripleSet();
 
-        /** @var array<string,Triple> $triples keyed for de-duplication, in first-seen order */
-        $triples = [];
-        $addAbout = static function (Iri $about, Iri $predicate, Iri|Literal $object) use (&$triples): bool {
-            $key = NTriplesSerializer::iri($about) . ' ' . NTriplesSerializer::iri($predicate) . ' ' . NTriplesSerializer::term($object);
-            if (isset($triples[$key])) {
-                return false;
-            }
-            $triples[$key] = new Triple($about, $predicate, $object);
-            return true;
-        };
-        $add = static fn (Iri $predicate, Iri|Literal $object): bool => $addAbout($subject, $predicate, $object);
+        $classIris = $this->classIris($row, $kind, $classes, $isConceptScheme);
+        $type = new Iri(Vocab::RDF_TYPE);
+        foreach ($classIris as $class) {
+            $triples->add($subject, $type, new Iri($class));
+        }
+        $this->addLabels(
+            $triples,
+            $subject,
+            $this->title($row, $values, $properties),
+            in_array(Vocab::SKOS . 'Concept', $classIris, true) ? $itemSetIds : null
+        );
+
         $links = [];
+        $lists = [];
+        foreach ($values as $value) {
+            $property = $properties[(int) $value['property_id']] ?? null;
+            if ($property === null || isset($this->excludedTerms[$property['term']])) {
+                continue;
+            }
+            $term = $property['term'];
+            if (isset($this->listProperties[$term])) {
+                $member = $this->listMember($value);
+                if ($member !== null) {
+                    $lists[$term] ??= ['predicate' => new Iri($property['iri']), 'members' => []];
+                    $lists[$term]['members'][] = $member;
+                }
+                continue;
+            }
+            $link = $this->addValue($triples, $subject, $term, new Iri($property['iri']), $value, $templateId);
+            if ($link !== null) {
+                $links[] = $link;
+            }
+        }
+        $this->addLists($triples, $subject, $lists);
+        $this->addStructure($triples, $subject, $kind, $itemSetIds, $mediaIds, $media);
 
+        $modifiedAt = $row['modified'] ?? $row['created'] ?? null;
+        $this->addRecordPage($triples, $subject, $id, $kind, $modifiedAt);
+
+        return new ResourceDescription($id, $kind, $modifiedAt, $triples->all(), $links);
+    }
+
+    /**
+     * The published classes: the resource class (or its replacement), the
+     * kind's own classes, skos:ConceptScheme for an item set holding
+     * concepts, and the fallback for an item with none of these.
+     *
+     * @param array<string,mixed> $row
+     * @param array<int,string> $classes
+     * @return string[]
+     */
+    private function classIris(array $row, string $kind, array $classes, bool $isConceptScheme): array
+    {
         $classIris = [];
         if ($row['resource_class_id'] !== null && isset($classes[(int) $row['resource_class_id']])) {
             $class = $classes[(int) $row['resource_class_id']];
@@ -269,161 +314,184 @@ final class ResourceProjector
         if (!$classIris && $kind === ResourceDescription::ITEM) {
             $classIris = $this->itemFallbackClasses;
         }
-        $type = new Iri(Vocab::RDF_TYPE);
-        foreach ($classIris as $class) {
-            $add($type, new Iri($class));
-        }
+        return $classIris;
+    }
 
-        $title = $this->title($row, $values, $properties);
+    /**
+     * rdfs:label, and for a concept skos:prefLabel and skos:inScheme its
+     * item sets.
+     *
+     * @param int[]|null $schemeIds the concept's item sets; null when it is not a concept
+     */
+    private function addLabels(TripleSet $triples, Iri $subject, string $title, ?array $schemeIds): void
+    {
         if ($title !== '') {
-            $add(Vocab::iri(Vocab::RDFS, 'label'), new Literal($title));
+            $triples->add($subject, Vocab::iri(Vocab::RDFS, 'label'), new Literal($title));
         }
-        if (in_array(Vocab::SKOS . 'Concept', $classIris, true)) {
-            if ($title !== '') {
-                $add(Vocab::iri(Vocab::SKOS, 'prefLabel'), new Literal($title));
+        if ($schemeIds === null) {
+            return;
+        }
+        if ($title !== '') {
+            $triples->add($subject, Vocab::iri(Vocab::SKOS, 'prefLabel'), new Literal($title));
+        }
+        foreach ($schemeIds as $schemeId) {
+            $triples->add($subject, Vocab::iri(Vocab::SKOS, 'inScheme'), $this->uris->resource($schemeId));
+        }
+    }
+
+    /**
+     * One public value that is not a list member: a link to a visible
+     * resource, a DOI, a URI or a literal.
+     *
+     * @param array<string,mixed> $value
+     * @return array{authority:string,predicate:string}|null the identity link it stated, if any
+     */
+    private function addValue(TripleSet $triples, Iri $subject, string $term, Iri $predicate, array $value, ?int $templateId): ?array
+    {
+        if ($value['value_resource_id'] !== null) {
+            // A link to a resource that is not visible is dropped entirely.
+            if ((int) $value['target_visible'] === 1) {
+                $triples->add($subject, $predicate, $this->uris->resource((int) $value['value_resource_id']));
             }
-            foreach ($itemSetIds as $itemSetId) {
-                $add(Vocab::iri(Vocab::SKOS, 'inScheme'), $this->uris->resource($itemSetId));
-            }
+            return null;
         }
 
-        /** @var array<string,array{predicate:Iri,members:array<int,Iri|Literal>}> $lists by term, in value order */
-        $lists = [];
-
-        foreach ($values as $value) {
-            $property = $properties[(int) $value['property_id']] ?? null;
-            if ($property === null || isset($this->excludedTerms[$property['term']])) {
-                continue;
-            }
-            $term = $property['term'];
-            $predicate = new Iri($property['iri']);
-
-            if (isset($this->listProperties[$term])) {
-                $member = $this->listMember($value);
-                if ($member !== null) {
-                    $lists[$term] ??= ['predicate' => $predicate, 'members' => []];
-                    $lists[$term]['members'][] = $member;
-                }
-                continue;
-            }
-
-            if ($value['value_resource_id'] !== null) {
-                if ((int) $value['target_visible'] === 1) {
-                    $add($predicate, $this->uris->resource((int) $value['value_resource_id']));
-                }
-                continue;
-            }
-
-            if ($this->identityLinks->holdsDoi($term)) {
-                $doi = $this->identityLinks->doi(trim((string) ($value['uri'] ?? '')) ?: (string) ($value['value'] ?? ''));
-                if ($doi !== null) {
-                    $add($predicate, new Literal($doi['doi']));
-                    if ($add(new Iri($doi['predicate']), new Iri($doi['iri']))) {
-                        $links[] = ['authority' => $doi['authority'], 'predicate' => $doi['predicate']];
-                    }
-                    continue;
-                }
-            }
-
-            $uri = trim((string) ($value['uri'] ?? ''));
-            if ($uri !== '') {
-                if (!Iri::isAbsolute($uri)) {
-                    $add($predicate, new Literal($uri));
-                    continue;
-                }
-                $link = $this->identityLinks->appliesTo($term)
-                    ? $this->identityLinks->match($uri, $templateId)
+        if ($this->identityLinks->holdsDoi($term)) {
+            $doi = $this->identityLinks->doi(trim((string) ($value['uri'] ?? '')) ?: (string) ($value['value'] ?? ''));
+            if ($doi !== null) {
+                $triples->add($subject, $predicate, new Literal($doi['doi']));
+                return $triples->add($subject, new Iri($doi['predicate']), new Iri($doi['iri']))
+                    ? ['authority' => $doi['authority'], 'predicate' => $doi['predicate']]
                     : null;
-                if (isset($this->literalProperties[$term])) {
-                    // dcterms:identifier's range is rdfs:Literal: the URI as a
-                    // string, its label (often the local id) beside it, and the
-                    // link itself through the identity predicate or rdfs:seeAlso.
-                    $add($predicate, new Literal($uri));
-                    $label = trim((string) ($value['value'] ?? ''));
-                    if ($label !== '' && $label !== $uri) {
-                        $add($predicate, new Literal($label));
-                    }
-                    if ($link === null) {
-                        $add(Vocab::iri(Vocab::RDFS, 'seeAlso'), new Iri($uri));
-                    }
-                } else {
-                    $add($predicate, new Iri($uri));
-                }
-                if ($link !== null && $add(new Iri($link['predicate']), new Iri($link['iri']))) {
-                    $links[] = ['authority' => $link['authority'], 'predicate' => $link['predicate']];
-                }
-                continue;
-            }
-
-            $literal = isset($this->decimalProperties[$term])
-                ? self::decimal((string) $value['type'], (string) ($value['value'] ?? ''))
-                : null;
-            $literal ??= self::literal((string) $value['type'], (string) ($value['value'] ?? ''), $value['lang'] ?? null);
-            if ($literal !== null) {
-                $add($predicate, $literal);
             }
         }
 
-        // Each list hangs off hash IRIs of the resource ({id}#authorList-1, -2, …),
-        // so the document that describes the resource also describes its lists.
+        $uri = trim((string) ($value['uri'] ?? ''));
+        if ($uri !== '') {
+            return $this->addUri($triples, $subject, $term, $predicate, $uri, trim((string) ($value['value'] ?? '')), $templateId);
+        }
+
+        $text = (string) ($value['value'] ?? '');
+        $literal = isset($this->decimalProperties[$term]) ? self::decimal((string) $value['type'], $text) : null;
+        $literal ??= self::literal((string) $value['type'], $text, $value['lang'] ?? null);
+        if ($literal !== null) {
+            $triples->add($subject, $predicate, $literal);
+        }
+        return null;
+    }
+
+    /**
+     * A URI value. On a property whose range is a literal (dcterms:identifier)
+     * it is stated as a string, its label beside it, and the link itself
+     * through the identity predicate or rdfs:seeAlso; elsewhere as an IRI. A
+     * matching authority URI also yields its identity link.
+     *
+     * @return array{authority:string,predicate:string}|null the identity link it stated, if any
+     */
+    private function addUri(TripleSet $triples, Iri $subject, string $term, Iri $predicate, string $uri, string $label, ?int $templateId): ?array
+    {
+        if (!Iri::isAbsolute($uri)) {
+            $triples->add($subject, $predicate, new Literal($uri));
+            return null;
+        }
+        $link = $this->identityLinks->appliesTo($term) ? $this->identityLinks->match($uri, $templateId) : null;
+        if (isset($this->literalProperties[$term])) {
+            $triples->add($subject, $predicate, new Literal($uri));
+            if ($label !== '' && $label !== $uri) {
+                $triples->add($subject, $predicate, new Literal($label));
+            }
+            if ($link === null) {
+                $triples->add($subject, Vocab::iri(Vocab::RDFS, 'seeAlso'), new Iri($uri));
+            }
+        } else {
+            $triples->add($subject, $predicate, new Iri($uri));
+        }
+        return $link !== null && $triples->add($subject, new Iri($link['predicate']), new Iri($link['iri']))
+            ? ['authority' => $link['authority'], 'predicate' => $link['predicate']]
+            : null;
+    }
+
+    /**
+     * Each list hangs off hash IRIs of the resource ({id}#authorList-1, -2, …),
+     * so the document that describes the resource also describes its lists.
+     * Each linked member is also stated under the list's flat predicate.
+     *
+     * @param array<string,array{predicate:Iri,members:array<int,Iri|Literal>}> $lists by term, in value order
+     */
+    private function addLists(TripleSet $triples, Iri $subject, array $lists): void
+    {
+        $first = new Iri(Vocab::RDF . 'first');
+        $rest = new Iri(Vocab::RDF . 'rest');
+        $nil = new Iri(Vocab::RDF . 'nil');
         foreach ($lists as $term => $list) {
             $local = (string) preg_replace('~^.*[:/#]~', '', $term);
             $node = static fn (int $position): Iri => new Iri($subject->value . '#' . $local . '-' . $position);
-            $add($list['predicate'], $node(1));
+            $triples->add($subject, $list['predicate'], $node(1));
             $count = count($list['members']);
             foreach ($list['members'] as $index => $member) {
-                $addAbout($node($index + 1), new Iri(Vocab::RDF . 'first'), $member);
-                $addAbout($node($index + 1), new Iri(Vocab::RDF . 'rest'), $index + 1 < $count ? $node($index + 2) : new Iri(Vocab::RDF . 'nil'));
+                $triples->add($node($index + 1), $first, $member);
+                $triples->add($node($index + 1), $rest, $index + 1 < $count ? $node($index + 2) : $nil);
                 if ($member instanceof Iri) {
-                    $add(new Iri($this->listProperties[$term]), $member);
+                    $triples->add($subject, new Iri($this->listProperties[$term]), $member);
                 }
             }
         }
+    }
 
+    /**
+     * Where the resource sits: an item's item sets and media; a media's item,
+     * file, media type and (for web ingesters) source address.
+     *
+     * @param int[] $itemSetIds
+     * @param int[] $mediaIds
+     * @param array<string,mixed>|null $media
+     */
+    private function addStructure(TripleSet $triples, Iri $subject, string $kind, array $itemSetIds, array $mediaIds, ?array $media): void
+    {
         if ($kind === ResourceDescription::ITEM) {
             foreach ($itemSetIds as $itemSetId) {
-                $add(Vocab::iri(Vocab::SCHEMA, 'isPartOf'), $this->uris->resource($itemSetId));
+                $triples->add($subject, Vocab::iri(Vocab::SCHEMA, 'isPartOf'), $this->uris->resource($itemSetId));
             }
             foreach ($mediaIds as $mediaId) {
-                $add(Vocab::iri(Vocab::SCHEMA, 'associatedMedia'), $this->uris->resource($mediaId));
+                $triples->add($subject, Vocab::iri(Vocab::SCHEMA, 'associatedMedia'), $this->uris->resource($mediaId));
             }
-        } elseif ($kind === ResourceDescription::MEDIA && $media !== null) {
-            $add(Vocab::iri(Vocab::SCHEMA, 'encodesCreativeWork'), $this->uris->resource((int) $media['item_id']));
-            $storageId = trim((string) ($media['storage_id'] ?? ''));
-            if ((int) $media['has_original'] === 1 && $storageId !== '') {
-                $add(Vocab::iri(Vocab::SCHEMA, 'contentUrl'), $this->uris->originalFile($storageId, $media['extension'] ?? null));
-            }
-            $mediaType = trim((string) ($media['media_type'] ?? ''));
-            if ($mediaType !== '') {
-                $add(Vocab::iri(Vocab::SCHEMA, 'encodingFormat'), new Literal($mediaType));
-            }
-            $source = trim((string) ($media['source'] ?? ''));
-            if (in_array($media['ingester'] ?? '', self::URL_SOURCE_INGESTERS, true) && preg_match('~^https?://\S+$~i', $source)) {
-                $add(Vocab::iri(Vocab::SCHEMA, 'url'), new Iri($source));
-            }
+            return;
         }
+        if ($kind !== ResourceDescription::MEDIA || $media === null) {
+            return;
+        }
+        $triples->add($subject, Vocab::iri(Vocab::SCHEMA, 'encodesCreativeWork'), $this->uris->resource((int) $media['item_id']));
+        $storageId = trim((string) ($media['storage_id'] ?? ''));
+        if ((int) $media['has_original'] === 1 && $storageId !== '') {
+            $triples->add($subject, Vocab::iri(Vocab::SCHEMA, 'contentUrl'), $this->uris->originalFile($storageId, $media['extension'] ?? null));
+        }
+        $mediaType = trim((string) ($media['media_type'] ?? ''));
+        if ($mediaType !== '') {
+            $triples->add($subject, Vocab::iri(Vocab::SCHEMA, 'encodingFormat'), new Literal($mediaType));
+        }
+        $source = trim((string) ($media['source'] ?? ''));
+        if (in_array($media['ingester'] ?? '', self::URL_SOURCE_INGESTERS, true) && preg_match('~^https?://\S+$~i', $source)) {
+            $triples->add($subject, Vocab::iri(Vocab::SCHEMA, 'url'), new Iri($source));
+        }
+    }
 
-        // The record page: what the resource is the primary topic of, and
-        // when that record last changed. Per resource, so a harvester of the
-        // dump can tell what moved since its last load.
-        $modifiedAt = $row['modified'] ?? $row['created'] ?? null;
+    /**
+     * The record page: what the resource is the primary topic of, and when
+     * that record last changed. Per resource, so a harvester of the dump can
+     * tell what moved since its last load.
+     */
+    private function addRecordPage(TripleSet $triples, Iri $subject, int $id, string $kind, ?string $modifiedAt): void
+    {
         $page = $this->uris->page($id, $kind);
-        if ($page !== null) {
-            $pageIri = new Iri($page);
-            $add(Vocab::iri(Vocab::FOAF, 'isPrimaryTopicOf'), $pageIri);
-            $modified = Literal::dateTime($modifiedAt);
-            if ($modified !== null) {
-                $addAbout($pageIri, Vocab::iri(Vocab::DCTERMS, 'modified'), $modified);
-            }
+        if ($page === null) {
+            return;
         }
-
-        return new ResourceDescription(
-            $id,
-            $kind,
-            $modifiedAt,
-            array_values($triples),
-            $links
-        );
+        $pageIri = new Iri($page);
+        $triples->add($subject, Vocab::iri(Vocab::FOAF, 'isPrimaryTopicOf'), $pageIri);
+        $modified = Literal::dateTime($modifiedAt);
+        if ($modified !== null) {
+            $triples->add($pageIri, Vocab::iri(Vocab::DCTERMS, 'modified'), $modified);
+        }
     }
 
     /**

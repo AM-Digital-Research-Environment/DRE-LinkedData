@@ -60,7 +60,7 @@ final class ChangeTracker
         try {
             $now = $this->now();
             $record = $this->read();
-            $started = self::startedAt($this->store->state());
+            $started = $this->store->state()?->since();
             // Everything recorded so far is in the current dump: start afresh.
             if ($record === null || ($started !== null && strcmp($record['last'], $started) < 0)) {
                 $record = ['since' => $now, 'count' => 0, 'last' => $now];
@@ -77,16 +77,16 @@ final class ChangeTracker
      * Changes the published dump does not contain, or null when it is up to
      * date (or when nothing has been recorded).
      *
-     * @param array<string,mixed>|null $state the dump state
+     * @param DumpState|null $state the published dump's state
      * @return array{since:string,count:int}|null
      */
-    public function pending(?array $state): ?array
+    public function pending(?DumpState $state): ?array
     {
         $record = $this->read();
         if ($record === null) {
             return null;
         }
-        $started = self::startedAt($state);
+        $started = $state?->since();
         if ($started !== null && strcmp($record['last'], $started) < 0) {
             return null;
         }
@@ -114,17 +114,6 @@ final class ChangeTracker
             return null;
         }
         return ['since' => $record['since'], 'count' => (int) ($record['count'] ?? 0), 'last' => $record['last']];
-    }
-
-    /** @param array<string,mixed>|null $state */
-    private static function startedAt(?array $state): ?string
-    {
-        foreach (['started_at', 'generated_at'] as $key) {
-            if (is_string($state[$key] ?? null) && $state[$key] !== '') {
-                return $state[$key];
-            }
-        }
-        return null;
     }
 
     private function now(): string

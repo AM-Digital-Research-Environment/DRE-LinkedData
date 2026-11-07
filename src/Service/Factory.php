@@ -84,12 +84,18 @@ final class Factory implements FactoryInterface
                 static fn (int $id): bool => $container->get(OmekaSource::class)->isVisible($id),
                 $container->get(ChangeTracker::class)
             ),
+            // The editorial settings, named after the default site when no
+            // dataset title is set. Shared: built once per request.
+            DatasetSettings::class => DatasetSettings::fromSettings(
+                $container->get('Omeka\Settings'),
+                $container->get(DefaultSite::class)->title()
+            ),
             DefaultSite::class => new DefaultSite($container->get('Omeka\ApiManager'), $container->get('Omeka\Settings')),
             ResourceController::class => new ResourceController(
                 $container->get(ResourceProjector::class),
                 $container->get(UriScheme::class),
                 $container->get(RdfWriter::class),
-                $container->get('Omeka\Settings')
+                self::lazy($container, DatasetSettings::class)
             ),
             DatasetController::class => new DatasetController(
                 $container->get(DatasetDescription::class),
@@ -97,8 +103,8 @@ final class Factory implements FactoryInterface
                 $container->get(UriScheme::class),
                 $container->get(RdfWriter::class),
                 $container->get(DefaultSite::class),
-                $container->get('Omeka\Settings'),
-                $container->get(LandingPage::class)
+                $container->get(LandingPage::class),
+                self::lazy($container, DatasetSettings::class)
             ),
             LandingPage::class => new LandingPage(
                 $container->get(OmekaSource::class),
@@ -108,19 +114,24 @@ final class Factory implements FactoryInterface
             // The block layout is registered under its layout name.
             'dreLinkedData', LinkedDataBlock::class => new LinkedDataBlock(
                 $container->get(DatasetSummary::class),
-                $container->get(DefaultSite::class),
-                $container->get('Omeka\Settings')
+                self::lazy($container, DatasetSettings::class)
             ),
             LinkedData::class => new LinkedData(
                 $container->get(UriScheme::class),
                 $container->get(SameAs::class),
                 static fn (): array => $container->get(DatasetSummary::class)->dataset(
-                    DatasetSettings::fromSettings($container->get('Omeka\Settings'), $container->get(DefaultSite::class)->title()),
+                    $container->get(DatasetSettings::class),
                     $container->get(LandingPage::class)->url()
                 )
             ),
             default => throw new ServiceNotCreatedException(sprintf('%s cannot create %s.', self::class, $requestedName)),
         };
+    }
+
+    /** A service fetched on first call, for consumers that may not need it. */
+    private static function lazy(ContainerInterface $container, string $name): \Closure
+    {
+        return static fn (): mixed => $container->get($name);
     }
 
     /**

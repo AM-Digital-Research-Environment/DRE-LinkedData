@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace DRELinkedData\Dataset;
 
+use DRELinkedData\Dump\DumpState;
 use DRELinkedData\Projection\IdentityLinks;
 use DRELinkedData\Projection\UriScheme;
 use DRELinkedData\Rdf\Format;
@@ -46,7 +47,7 @@ final class DatasetDescription
     }
 
     /**
-     * @param array<string,mixed>|null $state the dump state ({@see \DRELinkedData\Dump\DumpStore::state()})
+     * @param DumpState|null $state the published dump's state, null before the first run
      * @param Format|null $format the document's own format, or null when it
      *                            was served at the negotiated, extension-less URL
      * @param string|null $landingPage the page carrying the Linked open data
@@ -54,7 +55,7 @@ final class DatasetDescription
      *                                 stands in when there is none
      * @return Triple[]
      */
-    public function triples(DatasetSettings $settings, ?array $state, ?string $homepage, ?Format $format, ?string $landingPage = null): array
+    public function triples(DatasetSettings $settings, ?DumpState $state, ?string $homepage, ?Format $format, ?string $landingPage = null): array
     {
         $triples = [];
         $add = static function (Iri $subject, string $namespace, string $local, Iri|Literal $object) use (&$triples): void {
@@ -135,24 +136,24 @@ final class DatasetDescription
             return $triples;
         }
 
-        $modified = Literal::dateTime(is_string($state['generated_at'] ?? null) ? $state['generated_at'] : null);
-        $issued = Literal::dateTime(is_string($state['first_generated_at'] ?? null) ? $state['first_generated_at'] : null);
+        $modified = Literal::dateTime($state->generatedAt);
+        $issued = Literal::dateTime($state->firstGeneratedAt);
         if ($issued !== null) {
             $add($dataset, Vocab::DCTERMS, 'issued', $issued);
         }
         if ($modified !== null) {
             $add($dataset, Vocab::DCTERMS, 'modified', $modified);
         }
-        $add($dataset, Vocab::VOID, 'triples', $integer((int) ($state['triples'] ?? 0)));
-        $add($dataset, Vocab::VOID, 'entities', $integer((int) array_sum((array) ($state['resources'] ?? []))));
+        $add($dataset, Vocab::VOID, 'triples', $integer($state->triples));
+        $add($dataset, Vocab::VOID, 'entities', $integer($state->entities()));
         $add($dataset, Vocab::VOID, 'dataDump', new Iri($this->uris->dump()));
-        foreach ((array) ($state['vocabularies'] ?? []) as $namespace) {
-            if (is_string($namespace) && Iri::isAbsolute($namespace)) {
+        foreach ($state->vocabularies as $namespace) {
+            if (Iri::isAbsolute($namespace)) {
                 $add($dataset, Vocab::VOID, 'vocabulary', new Iri($namespace));
             }
         }
-        if (!empty($state['example_resource'])) {
-            $add($dataset, Vocab::VOID, 'exampleResource', $this->uris->resource((int) $state['example_resource']));
+        if ($state->exampleResource !== null) {
+            $add($dataset, Vocab::VOID, 'exampleResource', $this->uris->resource($state->exampleResource));
         }
 
         $distribution = $this->uris->distribution();
@@ -163,10 +164,10 @@ final class DatasetDescription
         $add($distribution, Vocab::DCAT, 'downloadURL', new Iri($this->uris->dump()));
         $add($distribution, Vocab::DCAT, 'mediaType', new Iri(Vocab::IANA_MEDIA . Format::NTriples->mediaType()));
         $add($distribution, Vocab::DCAT, 'compressFormat', new Iri(Vocab::IANA_MEDIA . 'application/gzip'));
-        if (isset($state['bytes'])) {
-            $add($distribution, Vocab::DCAT, 'byteSize', new Literal((string) (int) $state['bytes'], null, Vocab::XSD . 'nonNegativeInteger'));
+        if ($state->bytes !== null) {
+            $add($distribution, Vocab::DCAT, 'byteSize', new Literal((string) $state->bytes, null, Vocab::XSD . 'nonNegativeInteger'));
         }
-        $sha256 = strtolower((string) ($state['sha256'] ?? ''));
+        $sha256 = strtolower((string) $state->sha256);
         if (preg_match('~^[0-9a-f]{64}$~', $sha256)) {
             $checksum = $this->uris->distributionChecksum();
             $add($distribution, Vocab::SPDX, 'checksum', $checksum);
@@ -185,9 +186,9 @@ final class DatasetDescription
         // gets one void:Dataset node, described by its homepage and URI space.
         $authorities = $this->identityLinks->authorities();
         $targets = [];
-        foreach ((array) ($state['linksets'] ?? []) as $linkset) {
-            $authority = (string) ($linkset['authority'] ?? '');
-            $predicate = (string) ($linkset['predicate'] ?? '');
+        foreach ($state->linksets as $linkset) {
+            $authority = $linkset['authority'];
+            $predicate = $linkset['predicate'];
             if ($authority === '' || !Iri::isAbsolute($predicate)) {
                 continue;
             }
@@ -201,7 +202,7 @@ final class DatasetDescription
                 $targets[$authority] = $target;
             }
             $add($node, Vocab::VOID, 'linkPredicate', new Iri($predicate));
-            $add($node, Vocab::VOID, 'triples', $integer((int) ($linkset['triples'] ?? 0)));
+            $add($node, Vocab::VOID, 'triples', $integer($linkset['triples']));
         }
         foreach ($targets as $authority => $target) {
             $definition = $authorities[$authority];

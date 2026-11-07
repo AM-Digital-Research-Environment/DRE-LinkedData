@@ -273,7 +273,7 @@ try {
     $services->setService(DefaultSite::class, new SmokeDefaultSite(reflected(Omeka\Api\Manager::class), $settings));
 
     foreach ([OmekaSource::class, UriScheme::class, IdentityLinks::class, ResourceProjector::class, RdfWriter::class,
-        DumpStore::class, DumpGenerator::class, DatasetDescription::class, DatasetSummary::class, ChangeTracker::class, SameAs::class] as $type) {
+        DumpStore::class, DumpGenerator::class, DatasetDescription::class, DatasetSummary::class, ChangeTracker::class, SameAs::class, DatasetSettings::class] as $type) {
         smokeAssert($services->get($type) instanceof $type, sprintf('Factory failed for %s.', $type));
     }
     $factory = new Factory();
@@ -439,12 +439,16 @@ try {
     }
     $notModified = $dispatch(ResourceController::class, '/resource/7.ttl', null, ['If-None-Match' => $header($turtle, 'ETag')]);
     smokeAssert($notModified->getStatusCode() === 304, 'A matching ETag must give 304.');
+    // The document can change without the resource's own date moving (a
+    // linked resource turns private, the licence changes), so a date alone
+    // never earns a 304: only the ETag does.
     $unchangedSince = $dispatch(ResourceController::class, '/resource/7.ttl', null, ['If-Modified-Since' => 'Wed, 10 Jun 2026 00:00:00 GMT']);
-    smokeAssert($unchangedSince->getStatusCode() === 304, 'If-Modified-Since after the last change must give 304, got ' . $unchangedSince->getStatusCode());
-    $changedSince = $dispatch(ResourceController::class, '/resource/7.ttl', null, ['If-Modified-Since' => 'Mon, 01 Jun 2026 00:00:00 GMT']);
-    smokeAssert($changedSince->getStatusCode() === 200, 'If-Modified-Since before the last change must give 200.');
+    smokeAssert($unchangedSince->getStatusCode() === 200, 'If-Modified-Since alone must not give a 304, got ' . $unchangedSince->getStatusCode());
+    smokeAssert($header($unchangedSince, 'Last-Modified') !== '', 'Documents still state Last-Modified.');
     $etagWins = $dispatch(ResourceController::class, '/resource/7.ttl', null, ['If-None-Match' => '"other"', 'If-Modified-Since' => 'Wed, 10 Jun 2026 00:00:00 GMT']);
-    smokeAssert($etagWins->getStatusCode() === 200, 'If-None-Match takes precedence over If-Modified-Since.');
+    smokeAssert($etagWins->getStatusCode() === 200, 'A non-matching If-None-Match gives 200.');
+    $json = $dispatch(ResourceController::class, '/resource/7', 'application/json');
+    smokeAssert($json->getStatusCode() === 303 && $header($json, 'Location') === $base . '/resource/7.jsonld', 'A plain JSON client must be sent to the JSON-LD document, got ' . $json->getStatusCode());
     foreach (['/resource/2', '/resource/2.ttl', '/resource/5.nt', '/resource/9.jsonld'] as $hidden) {
         smokeAssert($dispatch(ResourceController::class, $hidden, 'text/turtle')->getStatusCode() === 404, "{$hidden} must be a 404.");
     }
@@ -454,10 +458,10 @@ try {
     smokeAssert($noDump->getStatusCode() === 404, 'No dump yet must be a 404.');
 
     $state = $services->get(DumpGenerator::class)->generate();
-    smokeAssert(is_array($state) && $state['resources'] === ['items' => 4, 'item_sets' => 2, 'media' => 1], 'Dump counts: ' . json_encode($state['resources'] ?? null));
+    smokeAssert($state !== null && $state->resources() === ['items' => 4, 'item_sets' => 2, 'media' => 1], 'Dump counts: ' . json_encode($state?->resources()));
     $dumpPath = $services->get(DumpStore::class)->dumpPath();
     $dumpGraph = canonicalGraph((string) gzdecode((string) file_get_contents($dumpPath)), 'ntriples');
-    smokeAssert(count($dumpGraph) === $state['triples'], 'The dump state miscounts its triples.');
+    smokeAssert(count($dumpGraph) === $state->triples, 'The dump state miscounts its triples.');
     foreach (['Secret title', 'Private working title', 'mongoId', 'resource/2>', 'resource/5>', 'internal-name'] as $leak) {
         smokeAssert(!str_contains(implode("\n", $dumpGraph), $leak), "Leaked into the dump: {$leak}");
     }
@@ -466,12 +470,12 @@ try {
     smokeAssert($dump instanceof Response\Stream && $dump->getStatusCode() === 200, 'The dump must stream.');
     smokeAssert($header($dump, 'Content-Type') === 'application/gzip', 'Wrong dump media type.');
     smokeAssert(str_contains($header($dump, 'Content-Disposition'), 'amira-linked-data.nt.gz'), 'Wrong dump filename.');
-    smokeAssert($header($dump, 'ETag') === '"' . substr($state['sha256'], 0, 32) . '"', 'The dump ETag is its checksum when the state describes it.');
+    smokeAssert($header($dump, 'ETag') === '"' . substr((string) $state->sha256, 0, 32) . '"', 'The dump ETag is its checksum when the state describes it.');
     fclose($dump->getStream());
     // Mid-swap, the state may describe another file: the ETag must not lie.
     $statePath = dirname($dumpPath) . '/state.json';
     $stateJson = (string) file_get_contents($statePath);
-    file_put_contents($statePath, json_encode(['bytes' => $state['bytes'] + 1] + $state));
+    file_put_contents($statePath, json_encode(['bytes' => $state->bytes + 1] + $state->toArray()));
     $midSwap = $dispatch(DatasetController::class, '/linked-data/dump.nt.gz');
     smokeAssert(str_starts_with($header($midSwap, 'ETag'), 'W/"'), 'A state that does not match the file must not provide the ETag.');
     fclose($midSwap->getStream());
@@ -489,10 +493,10 @@ try {
     smokeAssert(canonicalGraph($voidXml->getContent(), 'rdfxml') !== [], 'The VoID must be served as RDF/XML too.');
     $voidJsonLd = $dispatch(DatasetController::class, '/linked-data/void.jsonld');
     $voidGraph = canonicalGraph($voidTurtle->getContent(), 'turtle');
-    smokeAssert(in_array('<https://example.test/linked-data/void#dataset> <http://rdfs.org/ns/void#triples> "' . $state['triples'] . '"^^<http://www.w3.org/2001/XMLSchema#integer> .', $voidGraph, true), 'VoID lacks the triple count.');
+    smokeAssert(in_array('<https://example.test/linked-data/void#dataset> <http://rdfs.org/ns/void#triples> "' . $state->triples . '"^^<http://www.w3.org/2001/XMLSchema#integer> .', $voidGraph, true), 'VoID lacks the triple count.');
     smokeAssert(count(canonicalJsonLd($voidJsonLd->getContent())) === count($voidGraph), 'VoID JSON-LD and Turtle disagree.');
     smokeAssert(str_contains(implode("\n", $voidGraph), 'void#links-wikidata-sameAs'), 'VoID lacks the Wikidata linkset.');
-    foreach (['<http://www.w3.org/2006/vcard/ns#hasEmail> <mailto:dre@example.test>', 'spdx.org/rdf/terms#checksumValue> "' . $state['sha256'] . '"', '/dc/terms/issued>', 'dcat#keyword>'] as $expected) {
+    foreach (['<http://www.w3.org/2006/vcard/ns#hasEmail> <mailto:dre@example.test>', 'spdx.org/rdf/terms#checksumValue> "' . (string) $state->sha256 . '"', '/dc/terms/issued>', 'dcat#keyword>'] as $expected) {
         smokeAssert(str_contains(implode("\n", $voidGraph), $expected), "VoID lacks {$expected}");
     }
     $wellKnown = $dispatch(DatasetController::class, '/.well-known/void');
@@ -608,8 +612,8 @@ try {
     smokeAssert($helper() === $helper, 'dreLinkedData() without a resource returns the helper.');
     $dataset = $helper()->dataset();
     smokeAssert(array_keys($dataset) === ['uri', 'void', 'landingPage', 'title', 'description', 'licence', 'publisher', 'modified', 'triples', 'entities', 'distributions', 'sparqlEndpoint'], 'dataset() keys: ' . json_encode(array_keys($dataset)));
-    smokeAssert($dataset['uri'] === $base . '/linked-data/void#dataset' && $dataset['title'] === 'AMIRA Smoke' && $dataset['triples'] === $state['triples'], 'dataset(): ' . json_encode($dataset));
-    smokeAssert($dataset['distributions'][0]['bytes'] === $state['bytes'] && $dataset['distributions'][0]['encoding'] === 'application/gzip', 'dataset() distribution.');
+    smokeAssert($dataset['uri'] === $base . '/linked-data/void#dataset' && $dataset['title'] === 'AMIRA Smoke' && $dataset['triples'] === $state->triples, 'dataset(): ' . json_encode($dataset));
+    smokeAssert($dataset['distributions'][0]['bytes'] === $state->bytes && $dataset['distributions'][0]['encoding'] === 'application/gzip', 'dataset() distribution.');
 
     // Alternate links: on the item-set page (an item browse) and on show pages.
     $view = new PhpRenderer();

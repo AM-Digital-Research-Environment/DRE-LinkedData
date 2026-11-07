@@ -4,14 +4,12 @@ declare(strict_types=1);
 namespace DRELinkedData\Site\BlockLayout;
 
 use DRELinkedData\Dataset\DatasetSummary;
-use DRELinkedData\Service\DefaultSite;
 use DRELinkedData\Settings\DatasetSettings;
 use Laminas\Form\Element;
 use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\SitePageBlockRepresentation;
 use Omeka\Api\Representation\SitePageRepresentation;
 use Omeka\Api\Representation\SiteRepresentation;
-use Omeka\Settings\Settings;
 use Omeka\Site\BlockLayout\AbstractBlockLayout;
 use Omeka\Site\BlockLayout\TemplateableBlockLayoutInterface;
 
@@ -22,10 +20,14 @@ use Omeka\Site\BlockLayout\TemplateableBlockLayoutInterface;
  */
 class LinkedDataBlock extends AbstractBlockLayout implements TemplateableBlockLayoutInterface
 {
+    /**
+     * @param \Closure():DatasetSettings $datasetSettings resolved at render
+     *        time: the block manager builds every layout to list them, and
+     *        that must not cost a site lookup
+     */
     public function __construct(
         private readonly DatasetSummary $summary,
-        private readonly DefaultSite $site,
-        private readonly Settings $settings,
+        private readonly \Closure $datasetSettings,
     ) {
     }
 
@@ -60,6 +62,7 @@ class LinkedDataBlock extends AbstractBlockLayout implements TemplateableBlockLa
         return $view->formRow($heading) . $view->formRow($example);
     }
 
+    /** @return void */
     public function prepareRender(PhpRenderer $view)
     {
         $view->headLink()->appendStylesheet($view->assetUrl('css/dre-linked-data.css', 'DRELinkedData'));
@@ -67,6 +70,7 @@ class LinkedDataBlock extends AbstractBlockLayout implements TemplateableBlockLa
         $view->headScript()->appendFile($view->assetUrl('js/dre-linked-data.js', 'DRELinkedData'), 'text/javascript', ['defer' => 'defer']);
     }
 
+    /** @param string $templateViewScript */
     public function render(
         PhpRenderer $view,
         SitePageBlockRepresentation $block,
@@ -77,7 +81,7 @@ class LinkedDataBlock extends AbstractBlockLayout implements TemplateableBlockLa
             'block' => $block,
             'heading' => trim((string) $block->dataValue('heading', '')),
             'summary' => $this->summary->build(
-                DatasetSettings::fromSettings($this->settings, $this->site->title()),
+                ($this->datasetSettings)(),
                 $exampleId > 0 ? $exampleId : null
             ),
         ]);

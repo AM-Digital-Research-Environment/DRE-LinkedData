@@ -14,7 +14,6 @@ use DRELinkedData\Service\DefaultSite;
 use DRELinkedData\Settings\DatasetSettings;
 use Laminas\Http\Response;
 use Laminas\Http\Response\Stream;
-use Omeka\Settings\Settings;
 
 /**
  * Dataset-level endpoints:
@@ -30,16 +29,15 @@ use Omeka\Settings\Settings;
  */
 class DatasetController extends AbstractRdfController
 {
-    public const BLOCK_LAYOUT = LandingPage::BLOCK_LAYOUT;
-
     public function __construct(
         private readonly DatasetDescription $description,
         private readonly DumpStore $store,
         private readonly UriScheme $uris,
         private readonly RdfWriter $writer,
         private readonly DefaultSite $site,
-        private readonly Settings $settings,
         private readonly LandingPage $landingPage,
+        /** @var \Closure():DatasetSettings only the VoID needs them */
+        private readonly \Closure $datasetSettings,
     ) {
     }
 
@@ -49,7 +47,7 @@ class DatasetController extends AbstractRdfController
         $negotiated = $extension === null || $extension === '';
         if ($negotiated) {
             $accept = $this->accept();
-            $offers = Format::mediaTypes();
+            $offers = Format::mediaTypes(true);
             // Only a client that names HTML can prefer it; RDF clients never
             // pay for the page lookup.
             $page = $accept !== null && stripos($accept, 'html') !== false ? $this->landingPage->url() : null;
@@ -74,7 +72,7 @@ class DatasetController extends AbstractRdfController
             : null;
         $state = $this->store->state();
         $triples = $this->description->triples(
-            DatasetSettings::fromSettings($this->settings, $this->site->title()),
+            ($this->datasetSettings)(),
             $state,
             $homepage,
             $negotiated ? null : $format,
@@ -84,7 +82,7 @@ class DatasetController extends AbstractRdfController
         return $this->rdf(
             $this->writer->write($triples, $format),
             $format,
-            is_string($state['generated_at'] ?? null) ? $state['generated_at'] : null,
+            $state?->generatedAt,
             $negotiated,
             self::documentLinks(
                 $format,
@@ -112,10 +110,11 @@ class DatasetController extends AbstractRdfController
         // The state's checksum is the ETag only when it describes the file
         // actually opened: while a new dump is swapped in, state.json and
         // dump.nt.gz are renamed one after the other.
-        $size = (int) (fstat($handle)['size'] ?? 0);
-        $mtime = (int) (fstat($handle)['mtime'] ?? 0);
-        $sha256 = (string) ($state['sha256'] ?? '');
-        $etag = $sha256 !== '' && (int) ($state['bytes'] ?? -1) === $size
+        $stat = fstat($handle) ?: [];
+        $size = (int) ($stat['size'] ?? 0);
+        $mtime = (int) ($stat['mtime'] ?? 0);
+        $sha256 = (string) $state->sha256;
+        $etag = $sha256 !== '' && $state->bytes === $size
             ? '"' . substr($sha256, 0, 32) . '"'
             : 'W/"' . dechex($size) . '-' . dechex($mtime) . '"';
 
@@ -124,10 +123,9 @@ class DatasetController extends AbstractRdfController
         $headers->addHeaderLine('Content-Type', 'application/gzip');
         $headers->addHeaderLine('ETag', $etag);
         $headers->addHeaderLine('Cache-Control', 'public, max-age=0, must-revalidate');
-        $headers->addHeaderLine('Access-Control-Allow-Origin', '*');
-        $headers->addHeaderLine('Access-Control-Expose-Headers', self::EXPOSED_HEADERS);
+        self::cors($response);
         $headers->addHeaderLine('Link', '<' . $this->uris->voidDocument(Format::Turtle) . '>; rel="describedby"; type="text/turtle"');
-        $modified = $this->httpDate(is_string($state['generated_at'] ?? null) ? $state['generated_at'] : null);
+        $modified = $this->httpDate($state->generatedAt);
         if ($modified !== null) {
             $headers->addHeaderLine('Last-Modified', $modified);
         }

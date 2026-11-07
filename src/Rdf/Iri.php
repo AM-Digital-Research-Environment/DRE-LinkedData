@@ -28,7 +28,7 @@ final class Iri
         if (!mb_check_encoding($value, 'UTF-8')) {
             $value = (string) preg_replace_callback(
                 self::UTF8_OR_BYTE,
-                static fn (array $match): string => isset($match[2]) && $match[2] !== ''
+                static fn (array $match): string => isset($match[2])
                     ? sprintf('%%%02X', ord($match[2]))
                     : $match[1],
                 $value

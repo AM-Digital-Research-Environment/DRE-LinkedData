@@ -31,6 +31,7 @@ return [
             Service\DefaultSite::class => Service\Factory::class,
             Dump\ChangeTracker::class => Service\Factory::class,
             Projection\SameAs::class => Service\Factory::class,
+            Settings\DatasetSettings::class => Service\Factory::class,
         ],
     ],
 
@@ -77,7 +78,7 @@ return [
                     'constraints' => ['id' => '\d+', 'format' => 'ttl|nt|jsonld|rdf'],
                     'defaults' => [
                         'controller' => Controller\ResourceController::class,
-                        'action' => 'index',
+                        'action' => 'resource',
                     ],
                 ],
             ],

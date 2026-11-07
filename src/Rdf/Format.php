@@ -57,6 +57,20 @@ enum Format: string
         };
     }
 
+    /**
+     * Media types some clients ask for instead of the registered one, each
+     * answered with the format it maps to (served under its registered type).
+     * A JSON client that sends only `application/json` can read JSON-LD, and
+     * Turtle is valid N3. They come after every registered type in
+     * {@see mediaTypes()}, so they never win a tie.
+     */
+    public const ALIASES = [
+        'application/json' => self::JsonLd,
+        'text/n3' => self::Turtle,
+        'application/x-turtle' => self::Turtle,
+    ];
+
+    /** The format for a registered media type or one of its {@see ALIASES}. */
     public static function fromMediaType(string $mediaType): ?self
     {
         foreach (self::cases() as $format) {
@@ -64,13 +78,37 @@ enum Format: string
                 return $format;
             }
         }
-        return null;
+        return self::ALIASES[$mediaType] ?? null;
     }
 
-    /** @return string[] media types in server preference order */
-    public static function mediaTypes(): array
+    /**
+     * @param bool $withAliases also the {@see ALIASES}, after the registered types
+     * @return string[] media types in server preference order
+     */
+    public static function mediaTypes(bool $withAliases = false): array
     {
-        return array_map(static fn (self $format): string => $format->mediaType(), self::cases());
+        $types = array_map(static fn (self $format): string => $format->mediaType(), self::cases());
+        return $withAliases ? [...$types, ...array_keys(self::ALIASES)] : $types;
+    }
+
+    /**
+     * Label, media type and URL of the document in every format, in case
+     * order: the shape the view helper's `downloads` and the page block's
+     * format lists share.
+     *
+     * @param \Closure(self):string $url
+     * @return list<array{label:string,type:string,url:string}>
+     */
+    public static function documents(\Closure $url): array
+    {
+        return array_map(
+            static fn (self $format): array => [
+                'label' => $format->label(),
+                'type' => $format->mediaType(),
+                'url' => $url($format),
+            ],
+            self::cases()
+        );
     }
 
     /** The route constraint matching every extension (`ttl|nt|jsonld|rdf`). */

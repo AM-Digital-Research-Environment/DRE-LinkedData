@@ -106,9 +106,9 @@ jobs:
 
           # export-ignore regressions are silent otherwise — the zip just quietly grows.
           # scripts/ ships generate-dump.php only; the token lint stays out.
-          if grep -qE '^DRELinkedData/(tests/|scripts/(lib/|check-design-tokens)|\.github/|\.git)' <<< "$contents"; then
+          if grep -qE '^DRELinkedData/(tests/|scripts/(lib/|check-design-tokens)|\.github/|\.git|phpstan)' <<< "$contents"; then
             echo "::error::development files leaked into the archive:"
-            grep -E '^DRELinkedData/(tests/|scripts/(lib/|check-design-tokens)|\.github/|\.git)' <<< "$contents"
+            grep -E '^DRELinkedData/(tests/|scripts/(lib/|check-design-tokens)|\.github/|\.git|phpstan)' <<< "$contents"
             fail=1
           fi
 

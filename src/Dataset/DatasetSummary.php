@@ -138,7 +138,7 @@ final class DatasetSummary
                 'url' => $this->uris->dump(),
                 'type' => Format::NTriples->mediaType(),
                 'encoding' => 'application/gzip',
-                'bytes' => isset($state['bytes']) ? (int) $state['bytes'] : null,
+                'bytes' => $state->bytes,
             ];
         }
         return [
@@ -149,9 +149,9 @@ final class DatasetSummary
             'description' => $settings->description,
             'licence' => $settings->licence,
             'publisher' => ['name' => $settings->publisherName, 'uri' => $settings->publisherUri],
-            'modified' => is_string($state['generated_at'] ?? null) ? $state['generated_at'] : null,
-            'triples' => isset($state['triples']) ? (int) $state['triples'] : null,
-            'entities' => isset($state['resources']) ? (int) array_sum((array) $state['resources']) : null,
+            'modified' => $state?->generatedAt,
+            'triples' => $state?->triples,
+            'entities' => $state?->entities(),
             'distributions' => $distributions,
             'sparqlEndpoint' => $settings->sparqlEndpoint,
         ];
@@ -170,46 +170,36 @@ final class DatasetSummary
             $exampleId = null;
         }
 
-        $documents = static fn (callable $url): array => array_map(
-            static fn (Format $format): array => [
-                'label' => $format->label(),
-                'type' => $format->mediaType(),
-                'url' => $url($format),
-            ],
-            Format::cases()
-        );
-
-        $exampleId ??= isset($state['example_resource']) ? (int) $state['example_resource'] : null;
+        $exampleId ??= $state?->exampleResource;
         $example = null;
         if ($exampleId) {
             $example = [
                 'id' => $exampleId,
                 'uri' => $this->uris->resource($exampleId)->value,
-                'documents' => $documents(fn (Format $format): string => $this->uris->resourceDocument($exampleId, $format)),
+                'documents' => Format::documents(fn (Format $format): string => $this->uris->resourceDocument($exampleId, $format)),
             ];
         }
 
         $authorities = $this->identityLinks->authorities();
         $prefixes = ($this->prefixes)();
         $linksets = [];
-        foreach ((array) ($state['linksets'] ?? []) as $linkset) {
-            $authority = (string) ($linkset['authority'] ?? '');
-            $predicate = (string) ($linkset['predicate'] ?? '');
+        foreach ($state->linksets ?? [] as $linkset) {
+            $authority = $linkset['authority'];
+            $predicate = $linkset['predicate'];
             $compact = $prefixes->compact($predicate);
             $linksets[] = [
                 'label' => (string) ($authorities[$authority]['label'] ?? $authority),
                 'predicate' => $compact ? $compact[0] . ':' . $compact[1] : $predicate,
-                'triples' => (int) ($linkset['triples'] ?? 0),
+                'triples' => $linkset['triples'],
             ];
         }
 
         $vocabularies = [];
         $byNamespace = array_flip($prefixes->all());
-        foreach ((array) ($state['vocabularies'] ?? []) as $namespace) {
-            $vocabularies[] = ['prefix' => (string) ($byNamespace[$namespace] ?? ''), 'namespace' => (string) $namespace];
+        foreach ($state->vocabularies ?? [] as $namespace) {
+            $vocabularies[] = ['prefix' => (string) ($byNamespace[$namespace] ?? ''), 'namespace' => $namespace];
         }
 
-        $resources = (array) ($state['resources'] ?? []);
         return [
             'title' => $settings->title,
             'description' => $settings->description,
@@ -218,17 +208,17 @@ final class DatasetSummary
             'licence' => $settings->licence,
             'licenceLabel' => $settings->licence !== null ? self::licenceLabel($settings->licence) : null,
             'available' => $state !== null,
-            'generatedAt' => $state['generated_at'] ?? null,
-            'triples' => isset($state['triples']) ? (int) $state['triples'] : null,
+            'generatedAt' => $state?->generatedAt,
+            'triples' => $state?->triples,
             'resources' => [
-                'items' => (int) ($resources['items'] ?? 0),
-                'itemSets' => (int) ($resources['item_sets'] ?? 0),
-                'media' => (int) ($resources['media'] ?? 0),
+                'items' => $state->items ?? 0,
+                'itemSets' => $state->itemSets ?? 0,
+                'media' => $state->media ?? 0,
             ],
-            'bytes' => isset($state['bytes']) ? (int) $state['bytes'] : null,
-            'sha256' => isset($state['sha256']) ? (string) $state['sha256'] : null,
+            'bytes' => $state?->bytes,
+            'sha256' => $state?->sha256,
             'dumpUrl' => $this->uris->dump(),
-            'void' => $documents(fn (Format $format): string => $this->uris->voidDocument($format)),
+            'void' => Format::documents(fn (Format $format): string => $this->uris->voidDocument($format)),
             'voidUrl' => $this->uris->voidDocument(),
             'uriPattern' => $this->uris->resourceSpace() . '{id}',
             'example' => $example,
@@ -254,16 +244,16 @@ final class DatasetSummary
         ];
     }
 
-    /**
-     * "CC0 1.0", "CC BY 4.0", … for Creative Commons licence URIs; anything
-     * else is shown as its URI.
-     */
     /** The URL that runs $query at $endpoint with GET (SPARQL 1.1 Protocol). */
     public static function queryUrl(string $endpoint, string $query): string
     {
         return $endpoint . (str_contains($endpoint, '?') ? '&' : '?') . 'query=' . rawurlencode($query);
     }
 
+    /**
+     * "CC0 1.0", "CC BY 4.0", … for Creative Commons licence URIs; anything
+     * else is shown as its URI.
+     */
     public static function licenceLabel(string $uri): string
     {
         if (preg_match('~^https?://creativecommons\.org/publicdomain/zero/([\d.]+)/?$~i', $uri, $match)) {

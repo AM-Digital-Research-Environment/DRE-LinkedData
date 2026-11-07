@@ -33,7 +33,6 @@ use DRELinkedData\Dump\ChangeTracker;
 use DRELinkedData\Dump\DumpStore;
 use DRELinkedData\Projection\UriScheme;
 use DRELinkedData\Rdf\ContentNegotiator;
-use DRELinkedData\Service\DefaultSite;
 use DRELinkedData\Service\Factory;
 use DRELinkedData\Settings\DatasetSettings;
 use Laminas\EventManager\EventInterface;
@@ -62,6 +61,7 @@ class Module extends AbstractModule
     /** Set when the module answers a record page itself (the RDF 303). */
     private bool $answeredRecordPage = false;
 
+    /** @return array<string,mixed> */
     public function getConfig(): array
     {
         return include __DIR__ . '/config/module.config.php';
@@ -158,8 +158,7 @@ class Module extends AbstractModule
         $response->setStatusCode(303);
         $headers = $response->getHeaders();
         $headers->addHeaderLine('Location', $uris->resourceDocument($id, $format));
-        $headers->addHeaderLine('Access-Control-Allow-Origin', '*');
-        $headers->addHeaderLine('Access-Control-Expose-Headers', AbstractRdfController::EXPOSED_HEADERS);
+        AbstractRdfController::cors($response);
         $this->answeredRecordPage = true;
         return $response;
     }
@@ -190,6 +189,9 @@ class Module extends AbstractModule
         return $id > 0 ? $id : null;
     }
 
+    /**
+     * @param EventInterface<object|string|null, array<string,mixed>|\ArrayAccess<string,mixed>|object> $event
+     */
     public function addAlternateLinks(EventInterface $event): void
     {
         $view = $event->getTarget();
@@ -202,7 +204,11 @@ class Module extends AbstractModule
         }
     }
 
-    /** The item-set page is an item browse: alternates for the item set itself. */
+    /**
+     * The item-set page is an item browse: alternates for the item set itself.
+     *
+     * @param EventInterface<object|string|null, array<string,mixed>|\ArrayAccess<string,mixed>|object> $event
+     */
     public function addItemSetAlternateLinks(EventInterface $event): void
     {
         $view = $event->getTarget();
@@ -274,6 +280,8 @@ class Module extends AbstractModule
      * Counts a saved or deleted item, item set or media toward "the dump is
      * out of date". A new private resource does not change the public graph
      * and is not counted; an update or delete may have, and is.
+     *
+     * @param EventInterface<object|string|null, array<string,mixed>|\ArrayAccess<string,mixed>|object> $event
      */
     public function recordChange(EventInterface $event): void
     {
@@ -309,9 +317,7 @@ class Module extends AbstractModule
         try {
             $effectiveBase = Factory::baseUri($services);
             $form->get(DatasetSettings::BASE_URI)->setAttribute('placeholder', $effectiveBase);
-            $summary = $services->get(DatasetSummary::class)->build(
-                DatasetSettings::fromSettings($settings, $services->get(DefaultSite::class)->title())
-            );
+            $summary = $services->get(DatasetSummary::class)->build($services->get(DatasetSettings::class));
             $status = $renderer->partial('dre-linked-data/admin/status', [
                 'summary' => $summary,
                 'baseUriWarnings' => self::baseUriWarnings((string) $settings->get(DatasetSettings::BASE_URI, ''), $effectiveBase),

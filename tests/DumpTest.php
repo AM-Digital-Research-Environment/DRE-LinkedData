@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 use DRELinkedData\Dump\ChangeTracker;
 use DRELinkedData\Dump\DumpGenerator;
+use DRELinkedData\Dump\DumpState;
 use DRELinkedData\Dump\DumpStore;
 use DRELinkedData\Rdf\PrefixMap;
 use DRELinkedData\Rdf\Serializer\NTriplesSerializer;
@@ -46,24 +47,24 @@ test('the dump is the concatenation of every resource document, gzipped', functi
         $written = gzdecode((string) file_get_contents($store->dumpPath()));
         assertSameValue($expected, $written, 'batching must not change the output');
 
-        assertSameValue(substr_count($expected, "\n"), $state['triples']);
-        assertSameValue(['items' => 5, 'item_sets' => 2, 'media' => 2], $state['resources']);
-        assertSameValue(filesize($store->dumpPath()), $state['bytes']);
-        assertSameValue(hash_file('sha256', $store->dumpPath()), $state['sha256']);
-        assertSameValue(7392, $state['example_resource'], 'the richest item is the example');
+        assertSameValue(substr_count($expected, "\n"), $state->triples);
+        assertSameValue(['items' => 5, 'item_sets' => 2, 'media' => 2], $state->resources());
+        assertSameValue(filesize($store->dumpPath()), $state->bytes);
+        assertSameValue(hash_file('sha256', $store->dumpPath()), $state->sha256);
+        assertSameValue(7392, $state->exampleResource, 'the richest item is the example');
         assertSameValue([
             ['authority' => 'doi', 'predicate' => 'https://schema.org/sameAs', 'triples' => 2],
             ['authority' => 'gnd', 'predicate' => 'http://www.w3.org/2002/07/owl#sameAs', 'triples' => 1],
             ['authority' => 'loc', 'predicate' => 'http://www.w3.org/2004/02/skos/core#exactMatch', 'triples' => 1],
-        ], $state['linksets']);
-        assertTrue(in_array('http://am-digital.org/ontology/dre/', $state['vocabularies'], true));
-        assertTrue(in_array('https://schema.org/', $state['vocabularies'], true));
-        assertTrue(in_array('http://www.w3.org/2004/02/skos/core#', $state['vocabularies'], true));
-        assertTrue(in_array('http://purl.org/ontology/bibo/', $state['vocabularies'], true));
-        assertTrue(!in_array('http://xmlns.com/foaf/0.1/', $state['vocabularies'], true) || str_contains($expected, 'xmlns.com/foaf'), 'only vocabularies in use are listed');
-        assertSameValue($state, $store->state(), 'the state on disk is what generate() returned');
+        ], $state->linksets);
+        assertTrue(in_array('http://am-digital.org/ontology/dre/', $state->vocabularies, true));
+        assertTrue(in_array('https://schema.org/', $state->vocabularies, true));
+        assertTrue(in_array('http://www.w3.org/2004/02/skos/core#', $state->vocabularies, true));
+        assertTrue(in_array('http://purl.org/ontology/bibo/', $state->vocabularies, true));
+        assertTrue(!in_array('http://xmlns.com/foaf/0.1/', $state->vocabularies, true) || str_contains($expected, 'xmlns.com/foaf'), 'only vocabularies in use are listed');
+        assertSameValue($state->toArray(), $store->state()?->toArray(), 'the state on disk is what generate() returned');
         assertSameValue([], glob($dir . '/.*.part') ?: [], 'no part files are left behind');
-        assertTrue(str_contains($logger->records['info'][0] ?? '', 'wrote ' . $state['triples'] . ' triples for 9 resources'));
+        assertTrue(str_contains($logger->records['info'][0] ?? '', 'wrote ' . $state->triples . ' triples for 9 resources'));
         assertNotContainsText('Secret working title', $written, 'a private title never reaches the dump');
         assertContainsText('<http://xmlns.com/foaf/0.1/isPrimaryTopicOf> <' . FIXTURE_BASE . '/s/amira/item/7392> .', $written);
         assertContainsText('<' . FIXTURE_BASE . '/s/amira/item/7392> <http://purl.org/dc/terms/modified> ', $written, 'per-resource modification dates');
@@ -86,7 +87,7 @@ test('a stopped run leaves the previous dump in place', function (): void {
         });
         assertSameValue(null, $result);
         assertSameValue($before, file_get_contents($store->dumpPath()));
-        assertSameValue($first, $store->state());
+        assertSameValue($first?->toArray(), $store->state()?->toArray());
         assertSameValue([], glob($dir . '/.*.part') ?: []);
         assertTrue(isset($logger->records['notice']), 'the stop is logged');
     } finally {
@@ -126,17 +127,39 @@ test('the state records when the run started and when the dataset was first issu
     try {
         $store = new DumpStore($dir);
         $first = dumpGenerator($store, new MemoryLogger())->generate();
-        assertTrue(preg_match('~^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$~', (string) $first['started_at']) === 1);
-        assertSameValue($first['generated_at'], $first['first_generated_at'], 'the first run issues the dataset');
+        assertTrue(preg_match('~^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$~', (string) $first?->startedAt) === 1);
+        assertSameValue($first?->generatedAt, $first?->firstGeneratedAt, 'the first run issues the dataset');
 
         // Pretend the first run was long ago; a new run keeps that date.
-        file_put_contents($dir . '/state.json', json_encode(['first_generated_at' => '2020-01-01T00:00:00Z'] + $first));
+        file_put_contents($dir . '/state.json', json_encode(['first_generated_at' => '2020-01-01T00:00:00Z'] + (array) $first?->toArray()));
         $second = dumpGenerator($store, new MemoryLogger())->generate();
-        assertSameValue('2020-01-01T00:00:00Z', $second['first_generated_at']);
+        assertSameValue('2020-01-01T00:00:00Z', $second?->firstGeneratedAt);
         assertSameValue([], glob($dir . '/.*.part') ?: [], 'state and dump parts are both renamed into place');
     } finally {
         removeDirectory($dir);
     }
+});
+
+test('the state reads leniently and round-trips', function (): void {
+    $state = DumpState::fromArray([
+        'generated_at' => '2026-10-05T12:00:00Z',
+        'triples' => '12',
+        'resources' => ['items' => 3, 'item_sets' => 'x'],
+        'bytes' => 'not a number',
+        'vocabularies' => ['https://schema.org/', 42],
+        'linksets' => ['junk', ['authority' => 'gnd', 'predicate' => 'http://www.w3.org/2002/07/owl#sameAs', 'triples' => 5]],
+        'example_resource' => 0,
+    ]);
+    assertSameValue(12, $state->triples);
+    assertSameValue(['items' => 3, 'item_sets' => 0, 'media' => 0], $state->resources());
+    assertSameValue(3, $state->entities());
+    assertSameValue(null, $state->bytes, 'a malformed size is unknown, not zero');
+    assertSameValue(['https://schema.org/'], $state->vocabularies);
+    assertSameValue([['authority' => 'gnd', 'predicate' => 'http://www.w3.org/2002/07/owl#sameAs', 'triples' => 5]], $state->linksets);
+    assertSameValue(null, $state->exampleResource);
+    assertSameValue('2026-10-05T12:00:00Z', $state->since(), 'without a start time, the end time');
+    assertSameValue($state->toArray(), DumpState::fromArray($state->toArray())->toArray());
+    assertSameValue(DumpState::VERSION, $state->toArray()['version']);
 });
 
 test('changes are counted once per process and settled by the next dump', function (): void {
@@ -157,7 +180,7 @@ test('changes are counted once per process and settled by the next dump', functi
         assertSameValue(['since' => $now, 'count' => 3], $tracker->pending(null), 'no dump at all: everything is pending');
 
         // A dump that starts after the changes contains them.
-        $state = ['started_at' => '2026-10-01T11:00:00Z', 'generated_at' => '2026-10-01T11:05:00Z'];
+        $state = new DumpState('2026-10-01T11:05:00Z', '2026-10-01T11:00:00Z');
         assertSameValue(null, $tracker->pending($state));
         $tracker->settle('2026-10-01T11:00:00Z');
         assertSameValue(null, $settings->get(DatasetSettings::CHANGES), 'settled');
@@ -172,7 +195,7 @@ test('changes are counted once per process and settled by the next dump', functi
         // A stale record left by a run that did not settle starts afresh.
         $settings->set(DatasetSettings::CHANGES, ['since' => '2026-09-01T00:00:00Z', 'count' => 40, 'last' => '2026-09-02T00:00:00Z']);
         file_put_contents($dir . '/dump.nt.gz', gzencode(''));
-        file_put_contents($dir . '/state.json', json_encode($state));
+        file_put_contents($dir . '/state.json', json_encode($state->toArray()));
         $now = '2026-10-02T09:00:00Z';
         $tracker->record();
         $tracker->flush();

@@ -1,0 +1,39 @@
+# Static analysis of the module against the real Omeka S 4.2.1 classes.
+#
+# Run by CI's "Omeka S" job, which unpacks the checksum-pinned release and
+# points OMEKA_PATH at it; Omeka's own autoloader then resolves Omeka\,
+# Laminas\ and Doctrine\ as production does. Nothing is installed with
+# Composer: the module has no dependencies, development ones included.
+# Locally:
+#
+#   OMEKA_PATH=/path/to/omeka-s php phpstan.phar analyse
+#
+# Templates (.phtml) are not analysed; the integration smoke test renders them.
+# The unit tests are not either: tests/bootstrap.php declares stand-ins for
+# the Omeka classes they touch, which the real ones would collide with.
+parameters:
+    level: 6
+    # Omeka's PHPDoc is not always right (a representation's resourceClass()
+    # can be null), so defensive guards are not reported as always true.
+    treatPhpDocTypesAsCertain: false
+    # The module's floor (composer.json) through production's runtime.
+    phpVersion:
+        min: 80200
+        max: 80599
+    paths:
+        - Module.php
+        - src
+        - scripts/generate-dump.php
+    bootstrapFiles:
+        - tests/phpstan-bootstrap.php
+    ignoreErrors:
+        # View helpers and controller plugins are reached through Laminas's
+        # plugin brokers (__call), which PHPStan cannot see through: the view's
+        # formRow(), formCollection(), assetUrl() and this module's own
+        # dreLinkedData(), and the controller's messenger().
+        -
+            message: '#^Call to an undefined method Laminas\\View\\Renderer\\PhpRenderer::(formRow|formCollection|assetUrl|dreLinkedData)\(\)\.$#'
+            identifier: method.notFound
+        -
+            message: '#^Call to an undefined method Laminas\\Mvc\\Controller\\AbstractController::messenger\(\)\.$#'
+            identifier: method.notFound
