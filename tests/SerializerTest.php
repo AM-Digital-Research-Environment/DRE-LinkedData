@@ -10,6 +10,7 @@ use DRELinkedData\Rdf\Serializer\JsonLdSerializer;
 use DRELinkedData\Rdf\Serializer\NTriplesSerializer;
 use DRELinkedData\Rdf\Serializer\TurtleSerializer;
 use DRELinkedData\Rdf\Triple;
+use DRELinkedData\Rdf\TripleSet;
 use DRELinkedData\Rdf\Vocab;
 
 /** @return Triple[] */
@@ -185,4 +186,15 @@ test('IRIs scrub invalid UTF-8 by percent-encoding the stray bytes', function ()
     assertSameValue('urn', (new Iri('URN:isbn:1'))->scheme());
     $nt = (new NTriplesSerializer())->serialize([new Triple(new Iri("https://example.org/\xFF"), new Iri(Vocab::RDF_TYPE), new Iri('https://example.org/T'))]);
     assertTrue(mb_check_encoding($nt, 'UTF-8'));
+});
+
+test('a triple set keeps the first of equal statements, in order', function (): void {
+    $set = new TripleSet();
+    $s = new Iri('https://x.test/r/1');
+    $p = new Iri('http://www.w3.org/2000/01/rdf-schema#label');
+    assertTrue($set->add($s, $p, new Literal('A')));
+    assertTrue($set->add($s, $p, new Literal('A', 'en')), 'a language tag makes another literal');
+    assertTrue(!$set->add($s, $p, new Literal('A')), 'the same statement again is not added');
+    assertTrue($set->add($s, $p, new Iri('https://x.test/A')));
+    assertSameValue(['"A"', '"A"@en', '<https://x.test/A>'], array_map(static fn (Triple $t): string => NTriplesSerializer::term($t->object), $set->all()));
 });
