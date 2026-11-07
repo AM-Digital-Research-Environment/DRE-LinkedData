@@ -78,7 +78,7 @@ return [
                     'constraints' => ['id' => '\d+', 'format' => 'ttl|nt|jsonld|rdf'],
                     'defaults' => [
                         'controller' => Controller\ResourceController::class,
-                        'action' => 'index',
+                        'action' => 'resource',
                     ],
                 ],
             ],

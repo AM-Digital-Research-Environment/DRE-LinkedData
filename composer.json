@@ -27,6 +27,7 @@
     "lint:tokens": "node scripts/check-design-tokens.mjs",
     "test": "@php tests/run.php",
     "integration": "@php tests/integration/omeka-smoke.php",
+    "analyse": "phpstan analyse --no-progress --memory-limit=1G",
     "check": [
       "@lint",
       "@lint:tokens",

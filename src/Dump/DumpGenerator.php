@@ -124,7 +124,7 @@ final class DumpGenerator
                 startedAt: $startedAt,
                 // When the dataset was first published (dcterms:issued), carried
                 // over from run to run.
-                firstGeneratedAt: $previous?->firstGeneratedAt ?? $previous?->generatedAt ?? $generatedAt,
+                firstGeneratedAt: $previous->firstGeneratedAt ?? $previous->generatedAt ?? $generatedAt,
                 durationSeconds: round(microtime(true) - $started, 1),
                 triples: $triples,
                 items: $resources[ResourceDescription::ITEM],

@@ -61,6 +61,7 @@ class Module extends AbstractModule
     /** Set when the module answers a record page itself (the RDF 303). */
     private bool $answeredRecordPage = false;
 
+    /** @return array<string,mixed> */
     public function getConfig(): array
     {
         return include __DIR__ . '/config/module.config.php';
@@ -188,6 +189,9 @@ class Module extends AbstractModule
         return $id > 0 ? $id : null;
     }
 
+    /**
+     * @param EventInterface<object|string|null, array<string,mixed>|\ArrayAccess<string,mixed>|object> $event
+     */
     public function addAlternateLinks(EventInterface $event): void
     {
         $view = $event->getTarget();
@@ -200,7 +204,11 @@ class Module extends AbstractModule
         }
     }
 
-    /** The item-set page is an item browse: alternates for the item set itself. */
+    /**
+     * The item-set page is an item browse: alternates for the item set itself.
+     *
+     * @param EventInterface<object|string|null, array<string,mixed>|\ArrayAccess<string,mixed>|object> $event
+     */
     public function addItemSetAlternateLinks(EventInterface $event): void
     {
         $view = $event->getTarget();
@@ -272,6 +280,8 @@ class Module extends AbstractModule
      * Counts a saved or deleted item, item set or media toward "the dump is
      * out of date". A new private resource does not change the public graph
      * and is not counted; an update or delete may have, and is.
+     *
+     * @param EventInterface<object|string|null, array<string,mixed>|\ArrayAccess<string,mixed>|object> $event
      */
     public function recordChange(EventInterface $event): void
     {

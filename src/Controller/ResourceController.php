@@ -37,7 +37,7 @@ class ResourceController extends AbstractRdfController
     ) {
     }
 
-    public function indexAction(): Response
+    public function resourceAction(): Response
     {
         $id = (int) $this->params()->fromRoute('id', 0);
         $description = $id > 0 ? $this->projector->describeOne($id) : null;

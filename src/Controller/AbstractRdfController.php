@@ -45,7 +45,7 @@ abstract class AbstractRdfController extends AbstractActionController
         ?string $contentLocation = null
     ): Response {
         $etag = '"' . substr(hash('sha256', $body), 0, 32) . '"';
-        $response = $this->getResponse();
+        $response = $this->httpResponse();
         $headers = $response->getHeaders();
         $headers->addHeaderLine('Content-Type', $format->contentType());
         $headers->addHeaderLine('ETag', $etag);
@@ -99,7 +99,7 @@ abstract class AbstractRdfController extends AbstractActionController
 
     protected function seeOther(string $location): Response
     {
-        $response = $this->getResponse();
+        $response = $this->httpResponse();
         $response->setStatusCode(303);
         $headers = $response->getHeaders();
         $headers->addHeaderLine('Location', $location);
@@ -110,7 +110,7 @@ abstract class AbstractRdfController extends AbstractActionController
 
     protected function movedPermanently(string $location): Response
     {
-        $response = $this->getResponse();
+        $response = $this->httpResponse();
         $response->setStatusCode(301);
         $response->getHeaders()->addHeaderLine('Location', $location);
         self::cors($response);
@@ -124,7 +124,7 @@ abstract class AbstractRdfController extends AbstractActionController
      */
     protected function notAcceptable(array $offers): Response
     {
-        $response = $this->getResponse();
+        $response = $this->httpResponse();
         $response->setStatusCode(406);
         $headers = $response->getHeaders();
         $headers->addHeaderLine('Content-Type', 'text/plain; charset=utf-8');
@@ -136,11 +136,21 @@ abstract class AbstractRdfController extends AbstractActionController
 
     protected function notFound(): Response
     {
-        $response = $this->getResponse();
+        $response = $this->httpResponse();
         $response->setStatusCode(404);
         $response->getHeaders()->addHeaderLine('Content-Type', 'text/plain; charset=utf-8');
         self::cors($response);
         $response->setContent("Not found.\n");
+        return $response;
+    }
+
+    /** The response being built: always HTTP, since the module has only HTTP routes. */
+    protected function httpResponse(): Response
+    {
+        $response = $this->getResponse();
+        if (!$response instanceof Response) {
+            throw new \LogicException('DRELinkedData answers HTTP requests only.');
+        }
         return $response;
     }
 

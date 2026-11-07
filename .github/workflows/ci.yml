@@ -43,7 +43,7 @@ jobs:
         run: composer check
 
   omeka-smoke:
-    name: Omeka S 4.2.1 / PHP 8.5
+    name: Omeka S 4.2.1 / PHP 8.5 (smoke test, PHPStan)
     runs-on: ubuntu-latest
     env:
       OMEKA_VERSION: '4.2.1'
@@ -59,7 +59,7 @@ jobs:
           php-version: '8.5'
           extensions: dom, json, mbstring, zlib, pdo_sqlite
           coverage: none
-          tools: composer:v2
+          tools: composer:v2, phpstan:2.3.5
 
       - name: Download official Omeka S release
         shell: bash
@@ -72,3 +72,10 @@ jobs:
 
       - name: Run Omeka integration smoke test
         run: composer integration
+
+      # The module against the real Omeka S and Laminas classes, which this job
+      # has unpacked anyway (phpstan.neon.dist). Runs even when the smoke test
+      # fails, so one push reports both.
+      - name: Static analysis (PHPStan level 6)
+        if: ${{ !cancelled() }}
+        run: phpstan analyse --no-progress --error-format=github --memory-limit=1G

@@ -62,6 +62,7 @@ class LinkedDataBlock extends AbstractBlockLayout implements TemplateableBlockLa
         return $view->formRow($heading) . $view->formRow($example);
     }
 
+    /** @return void */
     public function prepareRender(PhpRenderer $view)
     {
         $view->headLink()->appendStylesheet($view->assetUrl('css/dre-linked-data.css', 'DRELinkedData'));
@@ -69,6 +70,7 @@ class LinkedDataBlock extends AbstractBlockLayout implements TemplateableBlockLa
         $view->headScript()->appendFile($view->assetUrl('js/dre-linked-data.js', 'DRELinkedData'), 'text/javascript', ['defer' => 'defer']);
     }
 
+    /** @param string $templateViewScript */
     public function render(
         PhpRenderer $view,
         SitePageBlockRepresentation $block,
