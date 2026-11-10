@@ -21,11 +21,18 @@ All notable changes to this project are documented here. The format follows
 
 ### Internal
 
+- **`composer bump-version -- <patch|minor|major|x.y.z>`** (`scripts/bump-version.php`)
+  writes every version declaration at once: `config/module.ini`, `CITATION.cff` (with
+  `date-released`) and the changelog, whose Unreleased notes become the dated release
+  section. `--check x.y.z` only verifies that they agree, for the release workflow. It
+  replaces bumping two files by hand, is unit-tested and stays out of the release zip.
+- Changelog release headings are `## [x.y.z] - YYYY-MM-DD`, with a hyphen, as in the other
+  DRE repositories; a unit test holds every heading to it.
 - `asset/js/dre-linked-data.js` has a syntax check (`composer lint:js`, `node --check`) and
   unit tests (`composer test:js`, `node --test` over a small fake DOM in `tests/js/`), both
   part of `composer check` and so of CI. No Node dependencies are installed.
 
-## [0.6.0] — 2026-11-07
+## [0.6.0] - 2026-11-07
 
 ### Added
 
@@ -66,7 +73,7 @@ All notable changes to this project are documented here. The format follows
   every installed copy since 0.3.0. The design-token lint in `scripts/` stays out of the
   archive.
 
-## [0.5.0] — 2026-10-22
+## [0.5.0] - 2026-10-22
 
 ### Added
 
@@ -82,7 +89,7 @@ All notable changes to this project are documented here. The format follows
 - `DatasetSummary::EXAMPLE_QUERIES`, and the `examples` key of the block summary's
   `sparql` entry.
 
-## [0.4.0] — 2026-10-22
+## [0.4.0] - 2026-10-22
 
 ### Added
 
@@ -93,14 +100,14 @@ All notable changes to this project are documented here. The format follows
   it as `sparqlEndpoint`. Empty, the default, changes nothing. The module still runs no
   triplestore: the endpoint is a separate service, such as the opt-in one in omeka-s-docker.
 
-## [0.3.1] — 2026-10-15
+## [0.3.1] - 2026-10-15
 
 ### Changed
 
 - The dataset's `dcat:landingPage` is now the public page that carries the *Linked open data* block (on AMIRA, `/s/amira/page/linked-open-data`), not the site's home. That page explains the figures, the dump and the URIs, so catalogues and dataset search engines should send people there. `foaf:homepage` stays the site. Without such a page, the home is still the landing page.
 - `dreLinkedData()->dataset()` returns that page as `landingPage` (null without one), so DRE SEO can give the schema.org `Dataset` the same page.
 
-## [0.3.0] — 2026-10-15
+## [0.3.0] - 2026-10-15
 
 ### Fixed
 
@@ -158,7 +165,7 @@ All notable changes to this project are documented here. The format follows
   parameter; `text/turtle` keeps it.
 - Numeric Data Types intervals are documented as plain literals.
 
-## [0.2.0] — 2026-10-14
+## [0.2.0] - 2026-10-14
 
 ### Changed
 
@@ -184,7 +191,7 @@ All notable changes to this project are documented here. The format follows
 - `geo:lat` and `geo:long` are typed `xsd:decimal` when numeric.
 
 
-## [0.1.0] — 2026-10-12
+## [0.1.0] - 2026-10-12
 
 ### Added
 

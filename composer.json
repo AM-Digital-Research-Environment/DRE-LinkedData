@@ -30,6 +30,7 @@
     "test:js": "node --test tests/js/*.test.mjs",
     "integration": "@php tests/integration/omeka-smoke.php",
     "analyse": "phpstan analyse --no-progress --memory-limit=1G",
+    "bump-version": "@php scripts/bump-version.php",
     "check": [
       "@lint",
       "@lint:js",

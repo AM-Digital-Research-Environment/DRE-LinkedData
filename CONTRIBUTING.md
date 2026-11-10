@@ -68,12 +68,25 @@ checksum-pinned Omeka S 4.2.1. Please run `composer check` before pushing, and
 
 Maintainers only:
 
-1. Bump `version` in **`config/module.ini`** and **`CITATION.cff`** (and add `date-released`).
-2. Update `CHANGELOG.md`.
-3. Commit, then tag: `git tag -a vX.Y.Z -m "..." && git push --follow-tags`.
+1. Write the release notes under `## [Unreleased]` in `CHANGELOG.md` as you work.
+2. On a clean, green `main`, bump every version declaration at once:
 
-The `Release` workflow refuses to publish if those two declared versions disagree with the
-tag. When they agree it runs the full test suite, builds `DRELinkedData.zip` with
+   ```bash
+   composer bump-version -- minor          # or patch, major, or an explicit x.y.z
+   composer bump-version -- minor --date 2026-11-12   # a release date other than today
+   ```
+
+   `scripts/bump-version.php` sets `version` in `config/module.ini` and `version` and
+   `date-released` in `CITATION.cff`, turns the Unreleased notes into
+   `## [x.y.z] - YYYY-MM-DD` under a fresh, empty `## [Unreleased]`, and moves the compare
+   links at the foot of the changelog. It checks everything before it writes anything,
+   refuses an empty Unreleased section, and never commits or tags. Do not edit these
+   versions by hand.
+3. `composer check`, commit (`Release x.y.z`), then tag and push:
+   `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin main vX.Y.Z`.
+
+The `Release` workflow refuses to publish unless `composer bump-version -- --check x.y.z`
+agrees with the tag (module.ini, CITATION.cff and a dated changelog section). When they agree it runs the full test suite, builds `DRELinkedData.zip` with
 `git archive --prefix=DRELinkedData/`, checks the archive for leaked development files, and
 attaches the zip plus a SHA-256 checksum to the release. Do not hand-build the zip.
 

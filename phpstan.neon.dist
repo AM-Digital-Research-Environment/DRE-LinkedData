@@ -24,6 +24,7 @@ parameters:
         - Module.php
         - src
         - scripts/generate-dump.php
+        - scripts/bump-version.php
     bootstrapFiles:
         - tests/phpstan-bootstrap.php
     ignoreErrors:
