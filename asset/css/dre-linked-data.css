@@ -118,6 +118,16 @@
     line-height: var(--leading-normal, 1.6);
 }
 
+/* After a dump, when the data has changed since: a warning, from the theme's
+   status tokens, so it does not read as the neutral notice above. Not an
+   error: every resource URI already serves the current data. The text keeps
+   --ink; the warning hue marks only the surface and its edge. */
+.dre-ld__notice--stale {
+    background: var(--warning-bg, #ffeec5);
+    border-color: var(--warning, #c87600);
+    border-inline-start-width: var(--space-1, 0.25rem);
+}
+
 /* ── Panels ────────────────────────────────────────────────────────────── */
 
 .dre-ld__grid {

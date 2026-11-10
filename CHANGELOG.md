@@ -13,6 +13,11 @@ All notable changes to this project are documented here. The format follows
   and their state as they are. Its progress, success and failure (an unreachable endpoint, a
   non-OK response, a body that fails to read) are announced through the status node and
   shown in a note beside the buttons. A download and a query no longer cancel each other.
+- **"Dump is out of date" looks like a warning.** The template emitted
+  `dre-ld__notice--stale`, which the stylesheet never styled, so it read as the neutral
+  notice. It now takes the theme's `--warning-bg` surface and a `--warning` edge, with the
+  theme's own values as fallbacks. A unit test fails on any modifier class a template emits
+  without a rule.
 
 ### Internal
 
