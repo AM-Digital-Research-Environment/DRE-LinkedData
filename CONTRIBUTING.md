@@ -61,6 +61,9 @@ checksum-pinned Omeka S 4.2.1. Please run `composer check` before pushing, and
   DRE-theme. Refresh that table from DRE-theme with
   `npm run vendor:lint ../DRE-LinkedData`; never edit `scripts/lib/` by hand.
 - Escape everything in `.phtml` templates (`$this->escapeHtml()` and friends).
+- Interface strings go through `$translate()` in templates, or carry `// @translate` on a
+  PHP line. After adding, changing or removing one, run `composer i18n` to regenerate
+  `language/template.pot`; `composer check` fails while the template is stale.
 - An identity link is a strong claim. `owl:sameAs` to the wrong entity is worse than no link,
   because every consumer merges the two.
 

@@ -30,11 +30,14 @@
     "test:js": "node --test tests/js/*.test.mjs",
     "integration": "@php tests/integration/omeka-smoke.php",
     "analyse": "phpstan analyse --no-progress --memory-limit=1G",
+    "i18n": "@php scripts/extract-strings.php",
+    "i18n:check": "@php scripts/extract-strings.php --check",
     "bump-version": "@php scripts/bump-version.php",
     "check": [
       "@lint",
       "@lint:js",
       "@lint:tokens",
+      "@i18n:check",
       "@test",
       "@test:js"
     ]

@@ -1,0 +1,384 @@
+# DRE Linked Data – translation template
+#
+# This file is distributed under the same licence as the DRE Linked Data module.
+# Regenerate with: composer i18n
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: DRE Linked Data\n"
+"Report-Msgid-Bugs-To: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: \n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: src/Form/ConfigForm.php
+msgid "Base URI"
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "Contact email"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Dataset"
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "Dataset description"
+msgstr ""
+
+#: view/dre-linked-data/admin/status.phtml
+msgid "Dataset description (VoID/DCAT)"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Dataset description formats"
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "Dataset title"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Download N-Triples"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Download data (CSV)"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Download data (JSON)"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Download started."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Download the dataset"
+msgstr ""
+
+#: view/dre-linked-data/admin/status.phtml
+msgid "Download the dump"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Dump generated"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Dump is out of date (%1$s changes since %2$s). Every resource URI already serves the current data."
+msgstr ""
+
+#: view/dre-linked-data/admin/status.phtml
+msgid "Dump is out of date (%1$s changes since %2$s). Tick \"Generate the dump now\" below, or run scripts/generate-dump.php."
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "Enter an absolute http(s) URI without a query or fragment."
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "Enter an absolute http(s) URI."
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "Enter an email address."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Every public item, item set and media has a permanent identifier:"
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "Every resource is identified as {base}/resource/{id}. Identifiers are meant to be permanent: set this once to the public address of the site (no trailing slash) and do not change it afterwards. Leave empty to use the address Omeka is currently reached at."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Example"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Example record formats"
+msgstr ""
+
+#: view/dre-linked-data/admin/status.phtml
+msgid "Example resource #%d (Turtle)"
+msgstr ""
+
+#: src/Site/BlockLayout/LinkedDataBlock.php
+msgid "Example resource ID"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Example:"
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "Generate the dump now"
+msgstr ""
+
+#: Module.php
+msgid "Generating the Linked Data dump in the background (job #%d)."
+msgstr ""
+
+#: src/Site/BlockLayout/LinkedDataBlock.php
+msgid "Heading"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Item sets"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Items"
+msgstr ""
+
+#: view/dre-linked-data/admin/status.phtml
+msgid "Last generated %1$s: %2$s triples for %3$s items, %4$s item sets and %5$s media (%6$s bytes)."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Link"
+msgstr ""
+
+#: view/dre-linked-data/admin/status.phtml
+msgid "Linked Data dump"
+msgstr ""
+
+#: src/Site/BlockLayout/LinkedDataBlock.php
+msgid "Linked open data"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Links"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Links to other datasets"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Loading…"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Media"
+msgstr ""
+
+#: src/Form/ConfigForm.php
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Metadata licence"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Most frequent places"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Most frequent subjects"
+msgstr ""
+
+#: Module.php
+msgid "No base URI is set. Identifiers currently follow the address Omeka is reached at, which can change; set the base URI to the public https address before publishing."
+msgstr ""
+
+#: view/dre-linked-data/admin/status.phtml
+msgid "No dump has been generated yet. Tick \"Generate the dump now\" below and save."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "No results match this query."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "No: the pattern does not match."
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "One or two sentences on what the dataset covers, for data catalogues and the page block."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Opened in a browser, it leads to the record page. Requested by a Linked Data client, it returns RDF in the format asked for."
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "Optional. An identifier for the publisher, such as its Wikidata entity or ROR record."
+msgstr ""
+
+#: src/Site/BlockLayout/LinkedDataBlock.php
+msgid "Optional. Leave empty when the page title already introduces the block."
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "Optional. Published as the dataset’s contact point (dcat:contactPoint) in the VoID/DCAT description. Nothing is published while this is empty."
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "Optional. The address of a read-only SPARQL endpoint loaded from this dataset’s dump, such as https://example.org/sparql. The module does not run one: set this only once the endpoint answers. It is then advertised in the VoID/DCAT description (void:sparqlEndpoint) and offered on the Linked open data page block with an example query. Nothing is advertised while this is empty."
+msgstr ""
+
+#: src/Site/BlockLayout/LinkedDataBlock.php
+msgid "Optional. The public item used to demonstrate the URI pattern. By default, the most richly described item in the latest dump."
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "People with an ORCID iD"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Preparing the download…"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Publisher"
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "Publisher URI"
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "Publisher name"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Query"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Query results"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Query with SPARQL"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Resource URIs"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Resources by class"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Resources linked to Wikidata"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Run this query"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "SHA-256"
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "SPARQL endpoint"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Send a query with GET or POST, following the SPARQL 1.1 Protocol. The Accept header chooses JSON, XML, CSV or TSV results. Or write one below, or start from an example, and run it here:"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Showing the first {shown} of {count} results. Download them all as CSV or JSON."
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "Starts a background job that rewrites the N-Triples dump and the figures in the dataset description. Run it after a sync (or schedule scripts/generate-dump.php): individual resource documents are always live, the dump is not."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "The SPARQL endpoint is temporarily unavailable."
+msgstr ""
+
+#: Module.php
+msgid "The base URI uses http. Permanent identifiers in production should use https."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "The complete public graph as gzipped N-Triples, ready to load into a triplestore such as Apache Jena Fuseki."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "The dataset description (VoID and DCAT) lists the vocabularies, the links to other datasets and the current figures:"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "The dump will appear here once it has been generated."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "The endpoint could not run this query:"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "The full data dump has not been published yet. Every public record is already available as Linked Data through its resource URI, described below."
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "The licence URI for the published metadata, e.g. https://creativecommons.org/publicdomain/zero/1.0/ or https://creativecommons.org/licenses/by/4.0/. It is stated on every RDF document and on the dump. Nothing is claimed while this is empty."
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "The organisation responsible for the dataset."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "The query could not be run."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "The query returned a graph, shown as Turtle."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "The results could not be downloaded."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "The results were cut short, perhaps because the query took too long. Add a LIMIT, or download the results instead."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "The same graph can be queried directly at a read-only SPARQL endpoint, loaded from the dump:"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Too many queries at once. Wait a moment and try again."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Triples"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Try again"
+msgstr ""
+
+#: src/Form/ConfigForm.php
+msgid "Used in the VoID/DCAT description and on the Linked open data page block. Defaults to the site title."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Vocabularies used (%s)"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Yes: the pattern matches."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "{count} results in {seconds} s."
+msgstr ""
+
+#: scripts/extract-strings.php
+msgid "…"
+msgstr ""
+

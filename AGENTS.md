@@ -22,9 +22,10 @@ and `docs/DESIGN-INTEGRATION.md` before a visual change.
 ## Commands
 
 ```bash
-composer check        # PHP lint, JS syntax check, token lint, PHP unit tests, JS unit tests
+composer check        # PHP lint, JS syntax check, token lint, i18n check, PHP and JS unit tests
 OMEKA_PATH=/abs/path/omeka-s composer integration    # smoke test against a real Omeka S 4.2.1
 OMEKA_PATH=/abs/path/omeka-s php phpstan.phar analyse --no-progress --memory-limit=1G
+composer i18n                                        # after adding, changing or removing a translatable string
 composer bump-version -- minor                       # the only way to bump; see "Releasing"
 ```
 
@@ -105,7 +106,9 @@ notes. Never build the archive by hand. Changelog headings are
 
 - British English in user-visible copy and documentation.
 - Escape everything in `.phtml` (`$this->escapeHtml()` and friends); wrap
-  visible strings in `$translate()`.
+  visible strings in `$translate()`, and mark PHP literals translated later
+  with `// @translate` on the same line. `composer i18n` regenerates
+  `language/template.pot`; `composer check` fails while it is stale.
 - Commit messages: an imperative or descriptive subject, a body explaining why.
 - Comments explain why, at the density of the surrounding code.
 - Actions in workflows are pinned to full commit SHAs with the release in a

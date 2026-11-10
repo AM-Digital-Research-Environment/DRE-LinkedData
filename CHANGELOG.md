@@ -25,6 +25,13 @@ All notable changes to this project are documented here. The format follows
   theme's own values as fallbacks. A unit test fails on any modifier class a template emits
   without a rule.
 
+### Added
+
+- `language/template.pot`, the translation template: every string the module wraps in
+  `translate()` or marks `// @translate` (92 today), so the interface can be translated.
+  `composer i18n` regenerates it (`scripts/extract-strings.php`, DRE SEO's extractor), and
+  `composer check` fails when it is stale.
+
 ### Internal
 
 - **The release is gated on the whole CI suite.** `release.yml` calls `ci.yml`

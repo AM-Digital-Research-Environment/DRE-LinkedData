@@ -423,7 +423,9 @@ view/                           block template and admin status panel
 asset/css/dre-linked-data.css   the block's styles, on the theme's tokens
 asset/js/dre-linked-data.js     runs the block's SPARQL form in place
 scripts/generate-dump.php       the dump from the command line or cron
-scripts/                        design-token lint (rules + table vendored from DRE-theme)
+scripts/                        design-token lint (rules + table vendored from DRE-theme),
+                                version bump, string extraction
+language/template.pot           translation template (composer i18n)
 tests/                          unit harness, fixtures, Omeka 4.2.1 integration smoke test
 tests/js/                       the script's unit tests (node --test, on a small fake DOM)
 ```

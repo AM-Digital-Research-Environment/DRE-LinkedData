@@ -35,6 +35,7 @@
 /scripts/lib                    export-ignore
 /scripts/check-design-tokens.mjs export-ignore
 /scripts/bump-version.php        export-ignore
+/scripts/extract-strings.php     export-ignore
 /CITATION.cff    export-ignore
 /.editorconfig   export-ignore
 /AGENTS.md       export-ignore
