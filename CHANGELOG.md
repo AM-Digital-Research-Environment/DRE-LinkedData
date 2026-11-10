@@ -38,6 +38,9 @@ All notable changes to this project are documented here. The format follows
   `scripts/lib/VENDORED.sha256`, as that manifest always said it did, so an in-place edit of
   a file DRE-theme owns fails the lint. The stylesheet header no longer cites a
   `tests/DesignTokenTest.php` that never existed.
+- `.editorconfig` (DRE-theme's, plus the files here that use two spaces) and `AGENTS.md`
+  (with a `CLAUDE.md` that imports it) for coding agents: the commands, what `composer check`
+  leaves to CI, and the cross-repository contracts. All three stay out of the release zip.
 - Every GitHub Action is pinned to a full commit SHA, with its release in a comment, in
   both workflows. Branch pushes run CI; a tag push runs it through the release workflow.
 - **`composer bump-version -- <patch|minor|major|x.y.z>`** (`scripts/bump-version.php`)
