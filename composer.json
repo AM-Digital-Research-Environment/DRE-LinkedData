@@ -25,13 +25,17 @@
   "scripts": {
     "lint": "@php tests/lint.php",
     "lint:tokens": "node scripts/check-design-tokens.mjs",
+    "lint:js": "node --check asset/js/dre-linked-data.js",
     "test": "@php tests/run.php",
+    "test:js": "node --test tests/js/*.test.mjs",
     "integration": "@php tests/integration/omeka-smoke.php",
     "analyse": "phpstan analyse --no-progress --memory-limit=1G",
     "check": [
       "@lint",
+      "@lint:js",
       "@lint:tokens",
-      "@test"
+      "@test",
+      "@test:js"
     ]
   }
 }

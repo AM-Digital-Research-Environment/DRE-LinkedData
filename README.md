@@ -294,7 +294,9 @@ IRIs into links, and follows the DRE asynchronous-state contract (DRE-theme
 `docs/DESIGN-INTEGRATION.md`): one persistent `role="status"` node, `aria-busy` only while a
 query runs, *Loading…*, an error with *Try again*, and a quiet message with no retry when the
 endpoint is unavailable. Technical detail goes to the console, except the endpoint's own
-message about a query it rejected, which is how a visitor finds the mistake.
+message about a query it rejected, which is how a visitor finds the mistake. A CSV or JSON
+download leaves the results as they are; whether it started or failed is announced by the
+status node and shown in a note beside the buttons.
 
 The block is built entirely on the DRE theme's design tokens. It uses colour, type,
 spacing, radius and motion tokens and reuses the theme's own `.button`, `.btn--secondary`,
@@ -423,12 +425,13 @@ asset/js/dre-linked-data.js     runs the block's SPARQL form in place
 scripts/generate-dump.php       the dump from the command line or cron
 scripts/                        design-token lint (rules + table vendored from DRE-theme)
 tests/                          unit harness, fixtures, Omeka 4.2.1 integration smoke test
+tests/js/                       the script's unit tests (node --test, on a small fake DOM)
 ```
 
 ## Development and testing
 
 ```bash
-composer check                                     # PHP lint, design-token lint, unit tests
+composer check                                     # PHP and JS lint, design-token lint, PHP and JS unit tests
 OMEKA_PATH=/path/to/omeka-s composer integration   # against a real Omeka S 4.2.1
 OMEKA_PATH=/path/to/omeka-s composer analyse       # PHPStan level 6, phpstan on the PATH
 ```

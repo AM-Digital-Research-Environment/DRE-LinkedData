@@ -189,6 +189,9 @@ $stats = [
             'unavailable' => $translate('The SPARQL endpoint is temporarily unavailable.'),
             'incomplete' => $translate('The results were cut short, perhaps because the query took too long. Add a LIMIT, or download the results instead.'),
             'error' => $translate('The query could not be run.'),
+            'preparing' => $translate('Preparing the download…'),
+            'downloaded' => $translate('Download started.'),
+            'downloadError' => $translate('The results could not be downloaded.'),
         ];
     ?>
     <section class="dre-ld__panel dre-ld__sparql" aria-labelledby="<?php echo $escapeAttr($blockId . '-sparql'); ?>" data-dre-ld-sparql data-labels="<?php echo $escapeAttr((string) json_encode($sparqlLabels, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)); ?>">
@@ -217,6 +220,8 @@ $stats = [
                 <button class="btn--secondary dre-ld__button" type="button" data-download="application/sparql-results+json" hidden><?php echo $escape($translate('Download data (JSON)')); ?></button>
             </p>
         </form>
+        <?php // What the status node says about a download, shown: that node is visually hidden. ?>
+        <p class="dre-ld__download-note" aria-hidden="true" hidden></p>
         <p class="dre-ld__status" role="status" aria-live="polite" aria-atomic="true"></p>
         <div class="dre-ld__results" role="region" aria-label="<?php echo $escapeAttr($translate('Query results')); ?>" aria-busy="false" hidden></div>
     </section>

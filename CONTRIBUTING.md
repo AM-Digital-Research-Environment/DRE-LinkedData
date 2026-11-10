@@ -19,8 +19,10 @@ cd DRE-LinkedData
 composer check
 ```
 
-`composer check` syntax-checks every PHP and PHTML file, runs the design-token lint (Node),
-and runs the unit harness. It needs no `composer install` — the module has **no runtime
+`composer check` syntax-checks every PHP and PHTML file and the block's script, runs the
+design-token lint, the PHP unit harness and the script's unit tests (`node --test`, over the
+small fake DOM in `tests/js/fake-dom.mjs`). Node 24 is the only other tool it needs; nothing
+is installed with npm. It needs no `composer install` — the module has **no runtime
 dependencies**, by design. Omeka's core `vendor/` supplies Laminas, PSR and Doctrine at
 runtime, and bundling duplicate copies of framework packages causes class-collision fatals
 that take down the whole site, not just the module. Never add `laminas/*` or `psr/*` to

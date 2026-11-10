@@ -15,6 +15,11 @@
  * itself (400), its message is shown, since it is about what the visitor wrote
  * and is the only way to find the mistake.
  *
+ * A download is not a new result: it leaves the results region (and its
+ * state) as it is, and reports its progress and any failure through the same
+ * status node, mirrored in a visible note beside the buttons because that node
+ * is visually hidden.
+ *
  * Every value from the endpoint is written as text; only http(s) IRIs become
  * links.
  */
@@ -57,7 +62,11 @@
         }
         const endpoint = form.getAttribute('action');
         const numbers = new Intl.NumberFormat(document.documentElement.lang || 'en');
-        let controller = null;
+        const note = panel.querySelector('.dre-ld__download-note');
+        // A query and a download each cancel their own predecessor, never the
+        // other: a download must not leave a running query's spinner behind.
+        let query = null;
+        let saving = null;
 
         const select = panel.querySelector('.dre-ld__select');
         if (select) {
@@ -69,7 +78,21 @@
 
         // ── The states of the results region ──────────────────────────────
 
+        // The download note mirrors what the status node says about a
+        // download; an empty message hides it.
+        const tell = (message) => {
+            status.textContent = message;
+            if (note) {
+                note.textContent = message;
+                note.hidden = message === '';
+            }
+        };
+
         const settle = (state, message, children) => {
+            if (note) {
+                note.hidden = true;
+                note.textContent = '';
+            }
             results.setAttribute('aria-busy', state === 'loading' ? 'true' : 'false');
             results.dataset.state = state;
             if (children) {
@@ -117,19 +140,27 @@
             settle(state, detail ? `${message} ${detail}` : message, [box]);
         };
 
-        // A failed response, as the state the visitor should see.
-        const fail = (response, body, retry) => {
+        // What a failed response means for the visitor. `message` is null when
+        // there is nothing more specific to say than the caller's own label.
+        const failure = (response, body) => {
             console.warn(`DRE Linked Data: the SPARQL endpoint answered HTTP ${response.status}.`, body);
             if (response.status === 400) {
                 // Oxigraph's message about the query is its first line.
-                notice('error', labels.invalid, body.split('\n', 1)[0].slice(0, 300));
-            } else if (response.status === 429) {
-                notice('error', labels.busy, null, retry);
-            } else if ([502, 503, 504].includes(response.status)) {
-                notice('unavailable', labels.unavailable);
-            } else {
-                notice('error', labels.error, null, retry);
+                return { state: 'error', message: labels.invalid, detail: body.split('\n', 1)[0].slice(0, 300) };
             }
+            if (response.status === 429) {
+                return { state: 'error', message: labels.busy, retry: true };
+            }
+            if ([502, 503, 504].includes(response.status)) {
+                return { state: 'unavailable', message: labels.unavailable };
+            }
+            return { state: 'error', message: null, retry: true };
+        };
+
+        // A failed query response, as the state the visitor should see.
+        const fail = (response, body, retry) => {
+            const reason = failure(response, body);
+            notice(reason.state, reason.message ?? labels.error, reason.detail, reason.retry ? retry : null);
         };
 
         const unreachable = (error, retry) => {
@@ -142,16 +173,12 @@
 
         // ── Requests ──────────────────────────────────────────────────────
 
-        const send = (accept) => {
-            controller?.abort();
-            controller = new AbortController();
-            return fetch(endpoint, {
-                method: 'POST',
-                headers: { Accept: accept, 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({ query: editor.value }),
-                signal: controller.signal,
-            });
-        };
+        const send = (accept, signal) => fetch(endpoint, {
+            method: 'POST',
+            headers: { Accept: accept, 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ query: editor.value }),
+            signal,
+        });
 
         const cell = (term) => {
             const td = document.createElement('td');
@@ -196,11 +223,13 @@
 
         const run = async () => {
             loading();
+            query?.abort();
+            query = new AbortController();
             const started = performance.now();
             let response;
             let body;
             try {
-                response = await send(ACCEPT);
+                response = await send(ACCEPT, query.signal);
                 body = await response.text();
             } catch (error) {
                 unreachable(error, run);
@@ -240,20 +269,33 @@
                 : format(labels.results, { count: numbers.format(bindings.length), seconds }), table(vars, bindings));
         };
 
+        // The results stay as they are: only the status node (and the note
+        // that mirrors it) speaks about a download.
         const download = async (type) => {
-            loading();
-            let response;
+            saving?.abort();
+            const request = new AbortController();
+            saving = request;
+            tell(labels.preparing);
+            let blob;
             try {
-                response = await send(type);
+                const response = await send(type, request.signal);
+                if (!response.ok) {
+                    const reason = failure(response, await response.text());
+                    const message = reason.message ?? labels.downloadError;
+                    tell(reason.detail ? `${message} ${reason.detail}` : message);
+                    return;
+                }
+                // The body can still fail after the headers arrived (a dropped
+                // connection, a request cut at its time limit).
+                blob = await response.blob();
             } catch (error) {
-                unreachable(error, () => download(type));
+                if (error.name !== 'AbortError') {
+                    console.warn('DRE Linked Data: the download failed.', error);
+                    tell(labels.downloadError);
+                }
                 return;
             }
-            if (!response.ok) {
-                fail(response, await response.text(), () => download(type));
-                return;
-            }
-            const url = URL.createObjectURL(await response.blob());
+            const url = URL.createObjectURL(blob);
             const link = element('a');
             link.href = url;
             link.download = type === 'text/csv' ? 'query-results.csv' : 'query-results.json';
@@ -261,7 +303,7 @@
             link.click();
             link.remove();
             setTimeout(() => URL.revokeObjectURL(url), 0);
-            settle('idle', '');
+            tell(labels.downloaded);
         };
 
         form.addEventListener('submit', (event) => {

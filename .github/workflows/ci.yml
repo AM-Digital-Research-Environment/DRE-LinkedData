@@ -29,8 +29,9 @@ jobs:
           coverage: none
           tools: composer:v2
 
-      # The design-token lint (scripts/check-design-tokens.mjs) is a Node script
-      # vendored from DRE-theme; `composer check` runs it.
+      # `composer check` runs three Node steps: the design-token lint vendored
+      # from DRE-theme, the block script's syntax check and its unit tests
+      # (node --test, no npm install).
       - name: Set up Node
         uses: actions/setup-node@v7
         with:

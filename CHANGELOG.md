@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **A CSV or JSON download no longer clears the query results.** The download drew the
+  loading state over the results and ended by emptying the region; it now leaves the results
+  and their state as they are. Its progress, success and failure (an unreachable endpoint, a
+  non-OK response, a body that fails to read) are announced through the status node and
+  shown in a note beside the buttons. A download and a query no longer cancel each other.
+
+### Internal
+
+- `asset/js/dre-linked-data.js` has a syntax check (`composer lint:js`, `node --check`) and
+  unit tests (`composer test:js`, `node --test` over a small fake DOM in `tests/js/`), both
+  part of `composer check` and so of CI. No Node dependencies are installed.
+
 ## [0.6.0] — 2026-11-07
 
 ### Added
