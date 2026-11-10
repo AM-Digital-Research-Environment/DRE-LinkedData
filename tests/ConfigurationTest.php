@@ -110,6 +110,13 @@ test('settings keys share one prefix and versions agree', function (): void {
     assertSameValue($ini[1] ?? null, $cff[1] ?? null, 'module.ini and CITATION.cff must declare the same version');
 });
 
+test('module.ini requires the Omeka S release CI tests against', function (): void {
+    $root = dirname(__DIR__);
+    preg_match('/^omeka_version_constraint\s*=\s*"([^"]+)"/m', (string) file_get_contents($root . '/config/module.ini'), $constraint);
+    preg_match("/OMEKA_VERSION: '([^']+)'/", (string) file_get_contents($root . '/.github/workflows/ci.yml'), $tested);
+    assertSameValue('^' . ($tested[1] ?? '?'), $constraint[1] ?? null, 'the constraint must start at the release the smoke test runs');
+});
+
 test('the vendored token table is the theme’s, untouched', function (): void {
     $table = json_decode((string) file_get_contents(dirname(__DIR__) . '/scripts/lib/dre-tokens-fallback.json'), true);
     assertTrue(is_array($table) && isset($table['shared']['--space-4'], $table['light']['--surface']), 'token table must parse');

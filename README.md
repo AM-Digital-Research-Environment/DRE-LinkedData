@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/AM-Digital-Research-Environment/DRE-LinkedData/actions/workflows/ci.yml/badge.svg)](https://github.com/AM-Digital-Research-Environment/DRE-LinkedData/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/AM-Digital-Research-Environment/DRE-LinkedData?sort=semver&label=release)](https://github.com/AM-Digital-Research-Environment/DRE-LinkedData/releases/latest)
-[![Omeka S ^4.2.0](https://img.shields.io/badge/Omeka%20S-%5E4.2.0-3b5f7d)](https://omeka.org/s/)
+[![Omeka S ^4.2.1](https://img.shields.io/badge/Omeka%20S-%5E4.2.1-3b5f7d)](https://omeka.org/s/)
 [![PHP >= 8.2](https://img.shields.io/badge/PHP-%E2%89%A5%208.2-777bb4)](https://www.php.net/)
 [![Licence: GPL-3.0-or-later](https://img.shields.io/badge/licence-GPL--3.0--or--later-009260)](LICENSE)
 
@@ -381,7 +381,7 @@ over that regex and opens nothing else. omeka-s-docker's AMIRA overlay ships it
 (`deploy/amira/nginx-well-known-void-location.conf`). Every other route reaches Omeka through
 the existing `try_files … /index.php`.
 
-**Requirements:** Omeka S `^4.2.0`, PHP `>= 8.2` with `zlib`. CI covers PHP 8.2 and the
+**Requirements:** Omeka S `^4.2.1`, PHP `>= 8.2` with `zlib`. CI covers PHP 8.2 and the
 production runtime, 8.5.
 
 ## Configuration

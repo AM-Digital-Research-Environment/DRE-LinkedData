@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Requires Omeka S 4.2.1** (`omeka_version_constraint = "^4.2.1"`), the release CI and the
+  smoke test run against and the constraint the other DRE modules declare. 4.2.0 was never
+  tested; a unit test now ties the constraint to the version CI checks.
+
 ### Fixed
 
 - **A CSV or JSON download no longer clears the query results.** The download drew the
