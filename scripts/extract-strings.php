@@ -67,7 +67,8 @@ foreach ($iterator as $file) {
         $found = [];
 
         // `'Some text', // @translate` — take the last literal before the marker.
-        if (preg_match('/^(.*)\/\/\s*@translate\s*$/', $line, $m)
+        if (
+            preg_match('/^(.*)\/\/\s*@translate\s*$/', $line, $m)
             && preg_match_all('/(?<!\\\\)([\'"])((?:\\\\.|(?!\1).)*)\1/', $m[1], $lit, PREG_SET_ORDER)
         ) {
             $last = end($lit);

@@ -34,7 +34,8 @@ final class ContentNegotiator
             $quality = null;
             $specificity = -1;
             foreach ($ranges as $range) {
-                if (($range['type'] !== '*' && $range['type'] !== $type)
+                if (
+                    ($range['type'] !== '*' && $range['type'] !== $type)
                     || ($range['subtype'] !== '*' && $range['subtype'] !== $subtype)
                 ) {
                     continue;

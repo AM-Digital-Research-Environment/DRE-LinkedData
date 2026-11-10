@@ -603,7 +603,8 @@ final class ResourceProjector
         }
         $month = (int) ($m[2] ?? 1);
         $day = (int) ($m[3] ?? 1);
-        if ($month < 1 || $month > 12 || $day < 1 || $day > self::daysInMonth((int) $m[1], $month)
+        if (
+            $month < 1 || $month > 12 || $day < 1 || $day > self::daysInMonth((int) $m[1], $month)
             || (int) ($m[4] ?? 0) > 23 || (int) ($m[5] ?? 0) > 59 || (int) ($m[6] ?? 0) > 59
         ) {
             return null;

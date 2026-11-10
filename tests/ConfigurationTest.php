@@ -29,12 +29,14 @@ test('authority patterns accept the identifier shapes AMIRA stores, in canonical
 
 test('identifiers that are not identities stay plain identifiers', function (): void {
     $links = new IdentityLinks(moduleConfig()['projection']['identity_links']);
-    foreach ([
-        'https://www.youtube.com/playlist?list=PLDlHB4qY36WjCq9RIsxLzeckaPB7nQxz9',
-        'https://gepris.dfg.de/gepris/projekt/390713894?language=en',
-        'https://www.wikidata.org/wiki/Special:EntityPage/Q42',
-        'https://doi.org/10.1017/S0021853721000372',
-    ] as $uri) {
+    foreach (
+        [
+            'https://www.youtube.com/playlist?list=PLDlHB4qY36WjCq9RIsxLzeckaPB7nQxz9',
+            'https://gepris.dfg.de/gepris/projekt/390713894?language=en',
+            'https://www.wikidata.org/wiki/Special:EntityPage/Q42',
+            'https://doi.org/10.1017/S0021853721000372',
+        ] as $uri
+    ) {
         assertSameValue(null, $links->match($uri, 6), $uri);
     }
     assertTrue($links->appliesTo('dcterms:identifier'));
@@ -54,13 +56,15 @@ test('every authority pattern compiles and names its target dataset', function (
 
 test('DOIs are recognised in every stored shape and nothing else', function (): void {
     $links = new IdentityLinks(moduleConfig()['projection']['identity_links']);
-    foreach ([
-        '10.1017/S0021853721000372',
-        'doi:10.1017/S0021853721000372',
-        'https://doi.org/10.1017/S0021853721000372',
-        'http://dx.doi.org/10.1017/S0021853721000372',
-        ' HTTPS://DOI.ORG/10.1017/S0021853721000372 ',
-    ] as $stored) {
+    foreach (
+        [
+            '10.1017/S0021853721000372',
+            'doi:10.1017/S0021853721000372',
+            'https://doi.org/10.1017/S0021853721000372',
+            'http://dx.doi.org/10.1017/S0021853721000372',
+            ' HTTPS://DOI.ORG/10.1017/S0021853721000372 ',
+        ] as $stored
+    ) {
         $doi = $links->doi($stored);
         assertSameValue('10.1017/S0021853721000372', $doi['doi'] ?? null, $stored);
         assertSameValue('https://doi.org/10.1017/S0021853721000372', $doi['iri'] ?? null, $stored);
@@ -89,11 +93,13 @@ test('routes, controllers and services are all wired through the factory', funct
         assertTrue(isset($factories[$controller]), $name . ' points at an unregistered controller');
     }
     $factorySource = (string) file_get_contents(dirname(__DIR__) . '/src/Service/Factory.php');
-    foreach (array_merge(
-        array_keys($config['service_manager']['factories']),
-        array_keys($config['controllers']['factories']),
-        array_keys($config['view_helpers']['factories'])
-    ) as $class) {
+    foreach (
+        array_merge(
+            array_keys($config['service_manager']['factories']),
+            array_keys($config['controllers']['factories']),
+            array_keys($config['view_helpers']['factories'])
+        ) as $class
+    ) {
         $short = substr((string) strrchr('\\' . $class, '\\'), 1);
         assertTrue(str_contains($factorySource, $short . '::class =>') || str_contains($factorySource, $short . '::class => new'), $class . ' has no arm in Service\\Factory');
     }

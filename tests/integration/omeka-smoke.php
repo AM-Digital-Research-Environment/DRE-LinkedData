@@ -164,32 +164,34 @@ try {
 
     // ── A miniature Omeka database ────────────────────────────────────────
     $connection = Doctrine\DBAL\DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
-    foreach ([
-        'CREATE TABLE vocabulary (id INTEGER PRIMARY KEY, prefix VARCHAR(190), namespace_uri VARCHAR(190))',
-        'CREATE TABLE property (id INTEGER PRIMARY KEY, vocabulary_id INTEGER, local_name VARCHAR(190))',
-        'CREATE TABLE resource_class (id INTEGER PRIMARY KEY, vocabulary_id INTEGER, local_name VARCHAR(190))',
-        'CREATE TABLE resource (id INTEGER PRIMARY KEY, resource_type VARCHAR(255), title TEXT, resource_class_id INTEGER,
-            resource_template_id INTEGER, is_public INTEGER, created VARCHAR(32), modified VARCHAR(32))',
-        'CREATE TABLE resource_template (id INTEGER PRIMARY KEY, label VARCHAR(190), title_property_id INTEGER)',
-        'CREATE TABLE site (id INTEGER PRIMARY KEY, slug VARCHAR(190), is_public INTEGER)',
-        'CREATE TABLE site_page (id INTEGER PRIMARY KEY, site_id INTEGER, slug VARCHAR(190), is_public INTEGER)',
-        'CREATE TABLE site_page_block (id INTEGER PRIMARY KEY, page_id INTEGER, layout VARCHAR(80), position INTEGER)',
-        'CREATE TABLE media (id INTEGER PRIMARY KEY, item_id INTEGER, ingester VARCHAR(255), source TEXT, media_type VARCHAR(190),
-            storage_id VARCHAR(190), extension VARCHAR(255), has_original INTEGER, position INTEGER)',
-        'CREATE TABLE item_item_set (item_id INTEGER, item_set_id INTEGER)',
-        'CREATE TABLE value (id INTEGER PRIMARY KEY, resource_id INTEGER, property_id INTEGER, value_resource_id INTEGER,
-            type VARCHAR(255), lang VARCHAR(255), value TEXT, uri TEXT, is_public INTEGER)',
-        "INSERT INTO vocabulary VALUES (1, 'dcterms', 'http://purl.org/dc/terms/'), (2, 'dre', 'http://am-digital.org/ontology/dre/'),
-            (3, 'foaf', 'http://xmlns.com/foaf/0.1/'), (4, 'fabio', 'http://purl.org/spar/fabio/'), (5, 'bibo', 'http://purl.org/ontology/bibo/')",
-        "INSERT INTO property VALUES (1, 1, 'title'), (3, 1, 'subject'), (7, 1, 'created'), (10, 1, 'identifier'), (663, 2, 'mongoId'),
-            (21, 1, 'alternative'), (112, 5, 'doi')",
-        "INSERT INTO resource_class VALUES (1, 3, 'Person'), (5, 4, 'AuthorityFile')",
-        // Template 6 (authority) titles by dcterms:alternative; 10 (research items) has no title property.
-        "INSERT INTO resource_template VALUES (6, 'Authority', 21), (10, 'Research item', NULL)",
-        "INSERT INTO site VALUES (1, 'amira', 1), (2, 'hidden', 0)",
-        "INSERT INTO site_page VALUES (1, 1, 'about', 1), (2, 1, 'data', 1), (3, 2, 'secret-data', 1), (4, 1, 'draft-data', 0)",
-        "INSERT INTO site_page_block VALUES (1, 1, 'html', 1), (2, 2, 'dreLinkedData', 1), (3, 3, 'dreLinkedData', 1), (4, 4, 'dreLinkedData', 1)",
-    ] as $sql) {
+    foreach (
+        [
+            'CREATE TABLE vocabulary (id INTEGER PRIMARY KEY, prefix VARCHAR(190), namespace_uri VARCHAR(190))',
+            'CREATE TABLE property (id INTEGER PRIMARY KEY, vocabulary_id INTEGER, local_name VARCHAR(190))',
+            'CREATE TABLE resource_class (id INTEGER PRIMARY KEY, vocabulary_id INTEGER, local_name VARCHAR(190))',
+            'CREATE TABLE resource (id INTEGER PRIMARY KEY, resource_type VARCHAR(255), title TEXT, resource_class_id INTEGER,
+                resource_template_id INTEGER, is_public INTEGER, created VARCHAR(32), modified VARCHAR(32))',
+            'CREATE TABLE resource_template (id INTEGER PRIMARY KEY, label VARCHAR(190), title_property_id INTEGER)',
+            'CREATE TABLE site (id INTEGER PRIMARY KEY, slug VARCHAR(190), is_public INTEGER)',
+            'CREATE TABLE site_page (id INTEGER PRIMARY KEY, site_id INTEGER, slug VARCHAR(190), is_public INTEGER)',
+            'CREATE TABLE site_page_block (id INTEGER PRIMARY KEY, page_id INTEGER, layout VARCHAR(80), position INTEGER)',
+            'CREATE TABLE media (id INTEGER PRIMARY KEY, item_id INTEGER, ingester VARCHAR(255), source TEXT, media_type VARCHAR(190),
+                storage_id VARCHAR(190), extension VARCHAR(255), has_original INTEGER, position INTEGER)',
+            'CREATE TABLE item_item_set (item_id INTEGER, item_set_id INTEGER)',
+            'CREATE TABLE value (id INTEGER PRIMARY KEY, resource_id INTEGER, property_id INTEGER, value_resource_id INTEGER,
+                type VARCHAR(255), lang VARCHAR(255), value TEXT, uri TEXT, is_public INTEGER)',
+            "INSERT INTO vocabulary VALUES (1, 'dcterms', 'http://purl.org/dc/terms/'), (2, 'dre', 'http://am-digital.org/ontology/dre/'),
+                (3, 'foaf', 'http://xmlns.com/foaf/0.1/'), (4, 'fabio', 'http://purl.org/spar/fabio/'), (5, 'bibo', 'http://purl.org/ontology/bibo/')",
+            "INSERT INTO property VALUES (1, 1, 'title'), (3, 1, 'subject'), (7, 1, 'created'), (10, 1, 'identifier'), (663, 2, 'mongoId'),
+                (21, 1, 'alternative'), (112, 5, 'doi')",
+            "INSERT INTO resource_class VALUES (1, 3, 'Person'), (5, 4, 'AuthorityFile')",
+            // Template 6 (authority) titles by dcterms:alternative; 10 (research items) has no title property.
+            "INSERT INTO resource_template VALUES (6, 'Authority', 21), (10, 'Research item', NULL)",
+            "INSERT INTO site VALUES (1, 'amira', 1), (2, 'hidden', 0)",
+            "INSERT INTO site_page VALUES (1, 1, 'about', 1), (2, 1, 'data', 1), (3, 2, 'secret-data', 1), (4, 1, 'draft-data', 0)",
+            "INSERT INTO site_page_block VALUES (1, 1, 'html', 1), (2, 2, 'dreLinkedData', 1), (3, 3, 'dreLinkedData', 1), (4, 4, 'dreLinkedData', 1)",
+        ] as $sql
+    ) {
         $connection->executeStatement($sql);
     }
     $resources = [
@@ -272,8 +274,10 @@ try {
     $services->setAllowOverride(true);
     $services->setService(DefaultSite::class, new SmokeDefaultSite(reflected(Omeka\Api\Manager::class), $settings));
 
-    foreach ([OmekaSource::class, UriScheme::class, IdentityLinks::class, ResourceProjector::class, RdfWriter::class,
-        DumpStore::class, DumpGenerator::class, DatasetDescription::class, DatasetSummary::class, ChangeTracker::class, SameAs::class, DatasetSettings::class] as $type) {
+    foreach (
+        [OmekaSource::class, UriScheme::class, IdentityLinks::class, ResourceProjector::class, RdfWriter::class,
+        DumpStore::class, DumpGenerator::class, DatasetDescription::class, DatasetSummary::class, ChangeTracker::class, SameAs::class, DatasetSettings::class] as $type
+    ) {
         smokeAssert($services->get($type) instanceof $type, sprintf('Factory failed for %s.', $type));
     }
     $factory = new Factory();
@@ -313,13 +317,15 @@ try {
     }
     $item = $projector->describeOne(7);
     $nt = $writer->write($item->triples, Format::NTriples);
-    foreach ([
-        '<https://example.test/resource/7> <http://purl.org/dc/terms/subject> <https://example.test/resource/1> .',
-        '<https://example.test/resource/7> <https://schema.org/isPartOf> <https://example.test/resource/3> .',
-        '<https://example.test/resource/7> <http://www.w3.org/2002/07/owl#sameAs> <http://www.wikidata.org/entity/Q408> .',
-        '"Research item"@en .',
-        '"1975-03"^^<http://www.w3.org/2001/XMLSchema#gYearMonth> .',
-    ] as $expected) {
+    foreach (
+        [
+            '<https://example.test/resource/7> <http://purl.org/dc/terms/subject> <https://example.test/resource/1> .',
+            '<https://example.test/resource/7> <https://schema.org/isPartOf> <https://example.test/resource/3> .',
+            '<https://example.test/resource/7> <http://www.w3.org/2002/07/owl#sameAs> <http://www.wikidata.org/entity/Q408> .',
+            '"Research item"@en .',
+            '"1975-03"^^<http://www.w3.org/2001/XMLSchema#gYearMonth> .',
+        ] as $expected
+    ) {
         smokeAssert(str_contains($nt, $expected), "Missing from resource 7:\n{$expected}\n\n{$nt}");
     }
     foreach (['resource/2>', 'resource/5>', 'resource/8>', 'Secret title', 'mongoId', '65f1c0ffee'] as $leak) {
@@ -360,17 +366,19 @@ try {
         $request->setUri($base . $path);
         return $router->match($request);
     };
-    foreach ([
-        '/resource/7' => ['dre-linked-data-resource', null],
-        '/resource/7.ttl' => ['dre-linked-data-resource', 'ttl'],
-        '/resource/7.jsonld' => ['dre-linked-data-resource', 'jsonld'],
-        '/resource/7.rdf' => ['dre-linked-data-resource', 'rdf'],
-        '/resource/7/' => ['dre-linked-data-resource-slash', null],
-        '/linked-data/void' => ['dre-linked-data-void', null],
-        '/linked-data/void.nt' => ['dre-linked-data-void', 'nt'],
-        '/linked-data/dump.nt.gz' => ['dre-linked-data-dump', null],
-        '/.well-known/void' => ['dre-linked-data-well-known', null],
-    ] as $path => [$name, $format]) {
+    foreach (
+        [
+            '/resource/7' => ['dre-linked-data-resource', null],
+            '/resource/7.ttl' => ['dre-linked-data-resource', 'ttl'],
+            '/resource/7.jsonld' => ['dre-linked-data-resource', 'jsonld'],
+            '/resource/7.rdf' => ['dre-linked-data-resource', 'rdf'],
+            '/resource/7/' => ['dre-linked-data-resource-slash', null],
+            '/linked-data/void' => ['dre-linked-data-void', null],
+            '/linked-data/void.nt' => ['dre-linked-data-void', 'nt'],
+            '/linked-data/dump.nt.gz' => ['dre-linked-data-dump', null],
+            '/.well-known/void' => ['dre-linked-data-well-known', null],
+        ] as $path => [$name, $format]
+    ) {
         $match = $route($path);
         smokeAssert($match !== null && $match->getMatchedRouteName() === $name, "{$path} did not route to {$name}.");
         smokeAssert($match->getParam('format') === $format, "{$path} parsed the wrong format.");
@@ -423,12 +431,14 @@ try {
     smokeAssert($header($turtle, 'Access-Control-Allow-Origin') === '*', 'RDF documents need open CORS.');
     smokeAssert($header($turtle, 'Access-Control-Expose-Headers') === 'ETag, Link, Content-Location', 'RDF documents must expose their headers.');
     $link = $header($turtle, 'Link');
-    foreach ([
-        '<' . $base . '/resource/7.nt>; rel="alternate"; type="application/n-triples"',
-        '<' . $base . '/resource/7.jsonld>; rel="alternate"; type="application/ld+json"',
-        '<' . $base . '/resource/7.rdf>; rel="alternate"; type="application/rdf+xml"',
-        '<' . $base . '/resource/7>; rel="describes"',
-    ] as $expected) {
+    foreach (
+        [
+            '<' . $base . '/resource/7.nt>; rel="alternate"; type="application/n-triples"',
+            '<' . $base . '/resource/7.jsonld>; rel="alternate"; type="application/ld+json"',
+            '<' . $base . '/resource/7.rdf>; rel="alternate"; type="application/rdf+xml"',
+            '<' . $base . '/resource/7>; rel="describes"',
+        ] as $expected
+    ) {
         smokeAssert(str_contains($link, $expected), "The Link header lacks {$expected}: {$link}");
     }
     smokeAssert(!str_contains($link, '7.ttl>'), 'A document does not list itself as an alternate.');
@@ -518,11 +528,13 @@ try {
         (new Laminas\Mvc\ModuleRouteListener())->onRoute($event);
         return [$module->negotiateRecordPage($event), $event->getResponse(), $event];
     };
-    foreach ([
-        '/s/amira/item/7' => ['site/resource-id', '/resource/7.ttl'],
-        '/s/amira/media/4' => ['site/resource-id', '/resource/4.ttl'],
-        '/s/amira/item-set/3' => ['site/item-set', '/resource/3.ttl'],
-    ] as $path => [$routeName, $target]) {
+    foreach (
+        [
+            '/s/amira/item/7' => ['site/resource-id', '/resource/7.ttl'],
+            '/s/amira/media/4' => ['site/resource-id', '/resource/4.ttl'],
+            '/s/amira/item-set/3' => ['site/item-set', '/resource/3.ttl'],
+        ] as $path => [$routeName, $target]
+    ) {
         [$result, $response, $event] = $negotiate($path, 'text/turtle');
         smokeAssert($event->getRouteMatch()->getMatchedRouteName() === $routeName, "{$path} routed to " . $event->getRouteMatch()->getMatchedRouteName());
         smokeAssert($result instanceof Response && $result->getStatusCode() === 303, "An RDF Accept on {$path} must 303.");

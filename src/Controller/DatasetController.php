@@ -143,5 +143,4 @@ class DatasetController extends AbstractRdfController
         $response->setStreamName($filename);
         return $response;
     }
-
 }

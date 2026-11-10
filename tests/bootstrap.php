@@ -94,14 +94,38 @@ namespace {
             return $this;
         }
 
-        public function emerg($message, $extra = []): self { return $this->record('emerg', $message); }
-        public function alert($message, $extra = []): self { return $this->record('alert', $message); }
-        public function crit($message, $extra = []): self { return $this->record('crit', $message); }
-        public function err($message, $extra = []): self { return $this->record('err', $message); }
-        public function warn($message, $extra = []): self { return $this->record('warn', $message); }
-        public function notice($message, $extra = []): self { return $this->record('notice', $message); }
-        public function info($message, $extra = []): self { return $this->record('info', $message); }
-        public function debug($message, $extra = []): self { return $this->record('debug', $message); }
+        public function emerg($message, $extra = []): self
+        {
+            return $this->record('emerg', $message);
+        }
+        public function alert($message, $extra = []): self
+        {
+            return $this->record('alert', $message);
+        }
+        public function crit($message, $extra = []): self
+        {
+            return $this->record('crit', $message);
+        }
+        public function err($message, $extra = []): self
+        {
+            return $this->record('err', $message);
+        }
+        public function warn($message, $extra = []): self
+        {
+            return $this->record('warn', $message);
+        }
+        public function notice($message, $extra = []): self
+        {
+            return $this->record('notice', $message);
+        }
+        public function info($message, $extra = []): self
+        {
+            return $this->record('info', $message);
+        }
+        public function debug($message, $extra = []): self
+        {
+            return $this->record('debug', $message);
+        }
     }
 
     /**

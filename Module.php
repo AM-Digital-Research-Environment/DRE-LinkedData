@@ -105,21 +105,25 @@ class Module extends AbstractModule
 
     public function attachListeners(SharedEventManagerInterface $sharedEventManager): void
     {
-        foreach ([
-            'Omeka\Controller\Site\Item',
-            'Omeka\Controller\Site\ItemSet',
-            'Omeka\Controller\Site\Media',
-        ] as $controller) {
+        foreach (
+            [
+                'Omeka\Controller\Site\Item',
+                'Omeka\Controller\Site\ItemSet',
+                'Omeka\Controller\Site\Media',
+            ] as $controller
+        ) {
             $sharedEventManager->attach($controller, 'view.show.after', [$this, 'addAlternateLinks']);
         }
         // /s/{slug}/item-set/{id} is the Item controller's browse action.
         $sharedEventManager->attach('Omeka\Controller\Site\Item', 'view.browse.after', [$this, 'addItemSetAlternateLinks']);
 
-        foreach ([
-            'Omeka\Api\Adapter\ItemAdapter',
-            'Omeka\Api\Adapter\ItemSetAdapter',
-            'Omeka\Api\Adapter\MediaAdapter',
-        ] as $adapter) {
+        foreach (
+            [
+                'Omeka\Api\Adapter\ItemAdapter',
+                'Omeka\Api\Adapter\ItemSetAdapter',
+                'Omeka\Api\Adapter\MediaAdapter',
+            ] as $adapter
+        ) {
             foreach (['api.create.post', 'api.update.post', 'api.delete.post'] as $apiEvent) {
                 $sharedEventManager->attach($adapter, $apiEvent, [$this, 'recordChange']);
             }
@@ -180,7 +184,8 @@ class Module extends AbstractModule
         $controller = strtolower((string) $match->getParam('__CONTROLLER__', $match->getParam('controller')));
         $controller = substr((string) strrchr('\\' . $controller, '\\'), 1);
         $controller = $controller === 'itemset' ? 'item-set' : $controller;
-        if (!in_array($controller, self::SITE_RESOURCE_CONTROLLERS, true)
+        if (
+            !in_array($controller, self::SITE_RESOURCE_CONTROLLERS, true)
             || $match->getParam('action', 'show') !== 'show'
         ) {
             return null;
