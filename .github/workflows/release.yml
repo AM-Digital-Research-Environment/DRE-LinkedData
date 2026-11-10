@@ -1,98 +1,113 @@
 name: Release
 
-# Builds the installable Omeka module zip for a version tag and attaches it to the
-# GitHub release, so every tagged version ships an asset an admin can drop straight
-# into `modules/`. The archive comes from `git archive`, which honours the
-# `export-ignore` rules in .gitattributes — tests and repository furniture stay out.
+# Builds the installable Omeka module zip for a version tag and attaches it to
+# the GitHub release, so every tagged version ships an asset an admin can drop
+# straight into `modules/`.
+#
+# Three jobs, so that nothing ships unchecked and no third-party code runs with
+# a write token:
+#
+#   gates    the whole CI suite (ci.yml, called as a reusable workflow) on the
+#            tagged tree: both PHP versions, the JS tests, the Omeka S 4.2.1
+#            smoke test and PHPStan. It used to be `composer check` on PHP 8.2
+#            alone.
+#   build    checks the tag (on the default branch, every version declaration
+#            agreeing with it), builds the archive with `git archive`, which
+#            honours the export-ignore rules in .gitattributes, verifies it,
+#            builds the release notes from CHANGELOG.md, and uploads all three
+#            as a run artifact. Read-only token.
+#   publish  (tags only) needs both, downloads that artifact, checks its
+#            sha256 and attaches it to the release. It is the only job with
+#            `contents: write`, and runs no third-party action but the
+#            artifact download.
+#
+# A manual run (workflow_dispatch) from a branch proves the build without
+# releasing; run from a tag, it rebuilds and re-attaches that tag's assets.
+#
+# Actions are pinned to commit SHAs; Dependabot keeps the pins current.
 
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Existing tag to (re)build and upload, e.g. v0.1.0'
-        required: true
-        type: string
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  release:
-    name: Build and publish DRELinkedData.zip
+  gates:
+    name: CI suite on the tagged tree
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  build:
+    name: Build and verify DRELinkedData.zip
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      artifact: ${{ steps.version.outputs.artifact }}
 
     steps:
-      - name: Resolve tag
-        id: tag
-        shell: bash
-        run: |
-          tag="${{ inputs.tag || github.ref_name }}"
-          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
-          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Check out repository at ${{ steps.tag.outputs.tag }}
-        uses: actions/checkout@v7
+      # fetch-depth 0 so the ancestry check below can see the default branch.
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ steps.tag.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-          extensions: json, mbstring, zlib
-          coverage: none
-          tools: composer:v2
-
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-
-      # A tag that cannot pass its own test suite must not ship an asset.
-      - name: Validate Composer metadata
-        run: composer validate --strict
-
-      - name: Lint and test
-        run: composer check
-
-      - name: Check declared versions match the tag
-        shell: bash
+      # A tag on a commit that never reached main would publish code that main
+      # does not contain. The gates job proves the tree is green; this proves
+      # it is the tree everyone has.
+      - name: Assert the tagged commit is on the default branch
+        if: github.ref_type == 'tag'
         env:
-          VERSION: ${{ steps.tag.outputs.version }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          fail=0
-
-          ini_version="$(sed -nE 's/^[[:space:]]*version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' config/module.ini | head -1)"
-          if [ "$ini_version" != "$VERSION" ]; then
-            echo "::error file=config/module.ini::version is '${ini_version}', tag says '${VERSION}'"
-            fail=1
-          fi
-
-          cff_version="$(sed -nE 's/^version:[[:space:]]*"?([^"[:space:]]+)"?.*/\1/p' CITATION.cff | head -1)"
-          if [ "$cff_version" != "$VERSION" ]; then
-            echo "::error file=CITATION.cff::version is '${cff_version}', tag says '${VERSION}'"
-            fail=1
-          fi
-
-          if [ "$fail" -ne 0 ]; then
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" "origin/$DEFAULT_BRANCH"; then
+            echo "::error::$GITHUB_REF_NAME ($GITHUB_SHA) is not an ancestor of origin/$DEFAULT_BRANCH; merge it before tagging"
             exit 1
           fi
-          echo "module.ini and CITATION.cff both declare ${VERSION}."
 
-      # The folder name inside the zip must be exactly `DRELinkedData` — Omeka matches the
-      # module directory against the PHP namespace.
+      - name: Set up PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          coverage: none
+
+      # The tag is the version, and every file that restates it must agree:
+      # module.ini, CITATION.cff (with an ISO date-released) and a dated
+      # CHANGELOG.md section. The list lives in scripts/bump-version.php, the
+      # script that writes them, not here.
+      - name: Resolve the version and check every declaration agrees
+        id: version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$(sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' config/module.ini | head -1)"
+            echo "::notice::Manual run from a branch: version taken from module.ini ($version); nothing is published"
+          fi
+          php scripts/bump-version.php --check "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "artifact=DRELinkedData-v$version" >> "$GITHUB_OUTPUT"
+
+      # The folder name inside the zip must be exactly `DRELinkedData`: Omeka
+      # matches the module directory against the PHP namespace.
       - name: Build DRELinkedData.zip
-        shell: bash
         run: |
           git archive --format=zip --prefix=DRELinkedData/ -o DRELinkedData.zip HEAD
           sha256sum DRELinkedData.zip > DRELinkedData.zip.sha256
           cat DRELinkedData.zip.sha256
 
       - name: Verify archive contents
-        shell: bash
         run: |
           contents="$(unzip -Z1 DRELinkedData.zip)"
           fail=0
@@ -104,31 +119,100 @@ jobs:
             fi
           done
 
-          # export-ignore regressions are silent otherwise — the zip just quietly grows.
-          # scripts/ ships generate-dump.php only; the token lint stays out.
-          if grep -qE '^DRELinkedData/(tests/|scripts/(lib/|check-design-tokens)|\.github/|\.git|phpstan)' <<< "$contents"; then
+          # export-ignore regressions are silent otherwise: the zip just quietly
+          # grows. scripts/ ships generate-dump.php only.
+          leaks='^DRELinkedData/(tests/|scripts/(lib/|check-design-tokens|bump-version)|\.github/|\.git|\.editorconfig|phpstan|AGENTS\.md|CLAUDE\.md|CITATION\.cff|CONTRIBUTING\.md|SECURITY\.md)'
+          if grep -qE "$leaks" <<< "$contents"; then
             echo "::error::development files leaked into the archive:"
-            grep -E '^DRELinkedData/(tests/|scripts/(lib/|check-design-tokens)|\.github/|\.git|phpstan)' <<< "$contents"
+            grep -E "$leaks" <<< "$contents"
             fail=1
           fi
 
           echo "Archive holds $(grep -vc '/$' <<< "$contents") files."
           exit "$fail"
 
+      # Release notes come from CHANGELOG.md, not --generate-notes: this project
+      # commits straight to main, so generated notes list the Dependabot pull
+      # requests and none of the actual changes.
+      - name: Build release notes from the changelog
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '
+            index($0, "## [" v "] - ") == 1 { f = 1; next }
+            /^## \[/ { f = 0 }
+            /^\[[^]]+\]: / { f = 0 }
+            f
+          ' CHANGELOG.md > SECTION.md
+          if ! grep -q '[^[:space:]]' SECTION.md; then
+            echo "::error file=CHANGELOG.md::no '## [$VERSION] - date' section to build release notes from"
+            exit 1
+          fi
+          {
+            cat SECTION.md
+            cat <<EOF
+
+          ## Install
+
+          Download \`DRELinkedData.zip\`, unzip it into your Omeka S \`modules/\`
+          directory and enable **DRE Linked Data** in the admin. The module has no
+          Composer dependencies. Verify the download with
+          \`sha256sum -c DRELinkedData.zip.sha256\`.
+
+          Requires Omeka S ^4.2.1 and PHP >= 8.2.
+
+          **Full changelog**: https://github.com/${GITHUB_REPOSITORY}/blob/v${VERSION}/CHANGELOG.md
+          EOF
+          } > RELEASE_NOTES.md
+          rm -f SECTION.md
+          cat RELEASE_NOTES.md
+
+      - name: Upload the archive and notes
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.version.outputs.artifact }}
+          path: |
+            DRELinkedData.zip
+            DRELinkedData.zip.sha256
+            RELEASE_NOTES.md
+          retention-days: 14
+          if-no-files-found: error
+
+  publish:
+    name: Publish the release
+    needs: [gates, build]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download the archive and notes
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.build.outputs.artifact }}
+
+      # The artifact crossed a job boundary; publish only the bytes the build
+      # job hashed.
+      - name: Check the archive against its sha256
+        run: sha256sum -c DRELinkedData.zip.sha256
+
       - name: Publish release assets
-        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.tag.outputs.tag }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG exists — replacing its assets."
-            gh release upload "$TAG" DRELinkedData.zip DRELinkedData.zip.sha256 --clobber
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME exists: replacing its assets and notes."
+            gh release upload "$GITHUB_REF_NAME" DRELinkedData.zip DRELinkedData.zip.sha256 --clobber
+            gh release edit "$GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md
           else
             prerelease=''
-            case "$TAG" in *-*) prerelease='--prerelease' ;; esac
-            gh release create "$TAG" DRELinkedData.zip DRELinkedData.zip.sha256 \
-              --title "$TAG" \
-              --generate-notes \
+            case "$GITHUB_REF_NAME" in *-*) prerelease='--prerelease' ;; esac
+            gh release create "$GITHUB_REF_NAME" DRELinkedData.zip DRELinkedData.zip.sha256 \
+              --verify-tag \
+              --title "DRE Linked Data $GITHUB_REF_NAME" \
+              --notes-file RELEASE_NOTES.md \
               $prerelease
           fi

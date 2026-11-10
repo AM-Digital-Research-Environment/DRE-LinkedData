@@ -85,10 +85,15 @@ Maintainers only:
 3. `composer check`, commit (`Release x.y.z`), then tag and push:
    `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin main vX.Y.Z`.
 
-The `Release` workflow refuses to publish unless `composer bump-version -- --check x.y.z`
-agrees with the tag (module.ini, CITATION.cff and a dated changelog section). When they agree it runs the full test suite, builds `DRELinkedData.zip` with
+The tag runs `.github/workflows/release.yml`. It first runs the whole CI suite
+(`ci.yml`, called as a reusable workflow) on the tagged tree: both PHP versions, the
+script's tests, the Omeka S smoke test and PHPStan. It refuses a tag that is not on `main`
+or that `composer bump-version -- --check x.y.z` disagrees with (module.ini, CITATION.cff
+and a dated changelog section). It then builds `DRELinkedData.zip` with
 `git archive --prefix=DRELinkedData/`, checks the archive for leaked development files, and
-attaches the zip plus a SHA-256 checksum to the release. Do not hand-build the zip.
+attaches the zip and its SHA-256 checksum to the release, with that version's changelog
+section as the release notes. Do not hand-build the zip. Run manually from a branch, the
+workflow proves the build without publishing anything.
 
 ## Licence
 

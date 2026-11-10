@@ -27,6 +27,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Internal
 
+- **The release is gated on the whole CI suite.** `release.yml` calls `ci.yml`
+  (`workflow_call`) on the tagged tree, so a tag must pass both PHP versions, the script's
+  tests, the Omeka S 4.2.1 smoke test and PHPStan; it used to run `composer check` on
+  PHP 8.2 alone. It also refuses a tag that is not on `main`, checks the versions with
+  `composer bump-version -- --check`, and takes the release notes from the version's
+  changelog section instead of `--generate-notes`. Only the final publish job holds
+  `contents: write`.
+- Every GitHub Action is pinned to a full commit SHA, with its release in a comment, in
+  both workflows. Branch pushes run CI; a tag push runs it through the release workflow.
 - **`composer bump-version -- <patch|minor|major|x.y.z>`** (`scripts/bump-version.php`)
   writes every version declaration at once: `config/module.ini`, `CITATION.cff` (with
   `date-released`) and the changelog, whose Unreleased notes become the dated release

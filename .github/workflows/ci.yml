@@ -1,8 +1,18 @@
 name: CI
 
+# The whole check suite. It runs on every branch push and pull request, and
+# the release workflow calls it (workflow_call) on the tagged tree before it
+# packages anything, so a release is gated on exactly what CI checks.
+#
+# Actions are pinned to commit SHAs with the release in a comment; Dependabot
+# (.github/dependabot.yml) keeps the pins current.
+
 on:
   push:
+    # Branches only: a tag push runs this suite through release.yml.
+    branches: ['**']
   pull_request:
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -12,6 +22,7 @@ jobs:
   test:
     name: PHP ${{ matrix.php }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -19,10 +30,12 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: ${{ matrix.php }}
           extensions: json, mbstring, zlib
@@ -33,7 +46,7 @@ jobs:
       # from DRE-theme, the block script's syntax check and its unit tests
       # (node --test, no npm install).
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
 
@@ -46,16 +59,19 @@ jobs:
   omeka-smoke:
     name: Omeka S 4.2.1 / PHP 8.5 (smoke test, PHPStan)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       OMEKA_VERSION: '4.2.1'
       OMEKA_SHA256: cc27d1c7aca0209523d19aa285f4a08e29e34950dcc446951a7c1311de348e82
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           extensions: dom, json, mbstring, zlib, pdo_sqlite
