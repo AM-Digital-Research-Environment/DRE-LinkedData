@@ -56,6 +56,29 @@ jobs:
       - name: Lint, design tokens and test
         run: composer check
 
+  coding-standard:
+    name: Coding standard (PSR-12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # phpcs as a setup-php tool, like PHPStan below: the module installs
+      # nothing with Composer, development tools included.
+      - name: Set up PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: phpcs:4.0.4
+
+      - name: PHP_CodeSniffer (phpcs.xml.dist)
+        run: phpcs
+
   omeka-smoke:
     name: Omeka S 4.2.1 / PHP 8.5 (smoke test, PHPStan)
     runs-on: ubuntu-latest

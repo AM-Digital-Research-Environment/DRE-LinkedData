@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `language/template.pot`, the translation template: every string the module wraps in
+  `translate()` or marks `// @translate` (92 today), so the interface can be translated.
+  `composer i18n` regenerates it (`scripts/extract-strings.php`, DRE SEO's extractor), and
+  `composer check` fails when it is stale.
+
 ### Changed
 
 - **Requires Omeka S 4.2.1** (`omeka_version_constraint = "^4.2.1"`), the release CI and the
@@ -25,18 +32,11 @@ All notable changes to this project are documented here. The format follows
   theme's own values as fallbacks. A unit test fails on any modifier class a template emits
   without a rule.
 
-### Added
-
-- `language/template.pot`, the translation template: every string the module wraps in
-  `translate()` or marks `// @translate` (92 today), so the interface can be translated.
-  `composer i18n` regenerates it (`scripts/extract-strings.php`, DRE SEO's extractor), and
-  `composer check` fails when it is stale.
-
 ### Internal
 
 - **The release is gated on the whole CI suite.** `release.yml` calls `ci.yml`
   (`workflow_call`) on the tagged tree, so a tag must pass both PHP versions, the script's
-  tests, the Omeka S 4.2.1 smoke test and PHPStan; it used to run `composer check` on
+  tests, the Omeka S 4.2.1 smoke test, PHPStan and PSR-12; it used to run `composer check` on
   PHP 8.2 alone. It also refuses a tag that is not on `main`, checks the versions with
   `composer bump-version -- --check`, and takes the release notes from the version's
   changelog section instead of `--generate-notes`. Only the final publish job holds
@@ -48,6 +48,11 @@ All notable changes to this project are documented here. The format follows
 - `.editorconfig` (DRE-theme's, plus the files here that use two spaces) and `AGENTS.md`
   (with a `CLAUDE.md` that imports it) for coding agents: the commands, what `composer check`
   leaves to CI, and the cross-repository contracts. All three stay out of the release zip.
+- PHP is checked against PSR-12 (`phpcs.xml.dist`, `composer lint:style`), in a CI job of
+  its own with PHP_CodeSniffer 4.0.4 as a setup-php tool. The sources were reformatted with
+  `phpcbf` in a separate, layout-only commit. Excluded, with the reasons in the ruleset: line
+  length, PSR-12's file-header order (the house order is DRE SEO's), and side effects and
+  several classes per file in the test harness's stand-ins.
 - Every GitHub Action is pinned to a full commit SHA, with its release in a comment, in
   both workflows. Branch pushes run CI; a tag push runs it through the release workflow.
 - **`composer bump-version -- <patch|minor|major|x.y.z>`** (`scripts/bump-version.php`)

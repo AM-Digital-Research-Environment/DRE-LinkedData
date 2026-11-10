@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<ruleset name="DRE Linked Data">
+    <description>PSR-12, as DRE SEO and DRE Search apply it.</description>
+
+    <file>Module.php</file>
+    <file>src</file>
+    <file>config</file>
+    <file>scripts</file>
+    <file>tests</file>
+
+    <arg name="extensions" value="php"/>
+    <arg name="colors"/>
+    <arg value="sp"/>
+
+    <rule ref="PSR12">
+        <!--
+            Omeka's config files are long data tables, and the SQL, the
+            authority patterns and the documentation blocks read better whole
+            than wrapped at a hard column limit.
+        -->
+        <exclude name="Generic.Files.LineLength"/>
+
+        <!--
+            Every file opens `<?php`, `declare(strict_types=1);`, then the file
+            docblock. PSR-12 wants the docblock first; the house order, shared
+            with DRE SEO, keeps strict_types beside the tag it qualifies.
+        -->
+        <exclude name="PSR12.Files.FileHeader"/>
+    </rule>
+
+    <!--
+        The test harness is plain PHP files that declare helpers and register
+        tests in one go (tests/run.php requires them), and tests/bootstrap.php
+        and the smoke test declare the Omeka stand-ins they need in one place,
+        each guarded by class_exists(). Splitting them per file would scatter
+        the boundary these files exist to make visible.
+    -->
+    <rule ref="PSR1.Files.SideEffects">
+        <exclude-pattern>tests/*</exclude-pattern>
+        <!-- Declares its functions and runs them from the command line, so a
+             test can include it without running it. -->
+        <exclude-pattern>scripts/bump-version\.php</exclude-pattern>
+    </rule>
+    <rule ref="PSR1.Classes.ClassDeclaration.MultipleClasses">
+        <exclude-pattern>tests/bootstrap\.php</exclude-pattern>
+        <exclude-pattern>tests/integration/omeka-smoke\.php</exclude-pattern>
+    </rule>
+    <rule ref="PSR1.Classes.ClassDeclaration.MissingNamespace">
+        <exclude-pattern>tests/integration/omeka-smoke\.php</exclude-pattern>
+    </rule>
+</ruleset>

@@ -25,15 +25,17 @@ and `docs/DESIGN-INTEGRATION.md` before a visual change.
 composer check        # PHP lint, JS syntax check, token lint, i18n check, PHP and JS unit tests
 OMEKA_PATH=/abs/path/omeka-s composer integration    # smoke test against a real Omeka S 4.2.1
 OMEKA_PATH=/abs/path/omeka-s php phpstan.phar analyse --no-progress --memory-limit=1G
+php phpcs.phar                                       # PSR-12 (phpcs.xml.dist); phpcbf.phar fixes layout
 composer i18n                                        # after adding, changing or removing a translatable string
 composer bump-version -- minor                       # the only way to bump; see "Releasing"
 ```
 
-`composer check` does **not** run the smoke test or PHPStan; CI does, in its
-`omeka-smoke` job, and the release is gated on it. Run both before committing a
+`composer check` does **not** run the smoke test, PHPStan or phpcs; CI does, in
+its `omeka-smoke` and `coding-standard` jobs, and the release is gated on them. Run both before committing a
 change to `Module.php`, `src/`, `config/` or `scripts/*.php`. They need an
 unpacked Omeka S 4.2.1 outside the repository (CI pins its sha256 in
-`.github/workflows/ci.yml`) and the PHPStan phar CI names there. Nothing is
+`.github/workflows/ci.yml`) and the PHPStan phar CI names there; phpcs is the
+PHP_CodeSniffer 4.0.4 phar, also named there. Nothing is
 installed with Composer: `composer.json` has scripts and no dependencies.
 
 ## Gotchas

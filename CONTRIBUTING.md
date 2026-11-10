@@ -43,7 +43,11 @@ Use the PHPStan phar or any global install; the module still installs nothing:
 OMEKA_PATH=/path/to/omeka-s composer analyse
 ```
 
-CI runs the unit suite on PHP 8.2 and 8.5, plus the smoke test and PHPStan against a
+PHP follows PSR-12 (`phpcs.xml.dist`, with its exceptions explained there). Run the
+PHP_CodeSniffer phar, or `composer lint:style` with `phpcs` on the PATH; `phpcbf` fixes the
+layout.
+
+CI runs the unit suite on PHP 8.2 and 8.5, plus PSR-12, the smoke test and PHPStan against a
 checksum-pinned Omeka S 4.2.1. Please run `composer check` before pushing, and
 `composer analyse` when you touch `src/`, `Module.php` or `scripts/generate-dump.php`.
 

@@ -436,6 +436,7 @@ tests/js/                       the script's unit tests (node --test, on a small
 composer check                                     # PHP and JS lint, design-token lint, PHP and JS unit tests
 OMEKA_PATH=/path/to/omeka-s composer integration   # against a real Omeka S 4.2.1
 OMEKA_PATH=/path/to/omeka-s composer analyse       # PHPStan level 6, phpstan on the PATH
+composer lint:style                                # PSR-12, phpcs on the PATH
 ```
 
 The integration test builds a small Omeka database in SQLite to prove the visibility SQL

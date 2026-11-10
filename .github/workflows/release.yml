@@ -9,7 +9,7 @@ name: Release
 #
 #   gates    the whole CI suite (ci.yml, called as a reusable workflow) on the
 #            tagged tree: both PHP versions, the JS tests, the Omeka S 4.2.1
-#            smoke test and PHPStan. It used to be `composer check` on PHP 8.2
+#            smoke test, PHPStan and the PSR-12 check. It used to be `composer check` on PHP 8.2
 #            alone.
 #   build    checks the tag (on the default branch, every version declaration
 #            agreeing with it), builds the archive with `git archive`, which
@@ -121,7 +121,7 @@ jobs:
 
           # export-ignore regressions are silent otherwise: the zip just quietly
           # grows. scripts/ ships generate-dump.php only.
-          leaks='^DRELinkedData/(tests/|scripts/(lib/|check-design-tokens|bump-version|extract-strings)|\.github/|\.git|\.editorconfig|phpstan|AGENTS\.md|CLAUDE\.md|CITATION\.cff|CONTRIBUTING\.md|SECURITY\.md)'
+          leaks='^DRELinkedData/(tests/|scripts/(lib/|check-design-tokens|bump-version|extract-strings)|\.github/|\.git|\.editorconfig|phpstan|phpcs|AGENTS\.md|CLAUDE\.md|CITATION\.cff|CONTRIBUTING\.md|SECURITY\.md)'
           if grep -qE "$leaks" <<< "$contents"; then
             echo "::error::development files leaked into the archive:"
             grep -E "$leaks" <<< "$contents"
