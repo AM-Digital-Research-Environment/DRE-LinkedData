@@ -34,6 +34,10 @@ All notable changes to this project are documented here. The format follows
   `composer bump-version -- --check`, and takes the release notes from the version's
   changelog section instead of `--generate-notes`. Only the final publish job holds
   `contents: write`.
+- `composer lint:tokens` verifies the vendored token rules and table against
+  `scripts/lib/VENDORED.sha256`, as that manifest always said it did, so an in-place edit of
+  a file DRE-theme owns fails the lint. The stylesheet header no longer cites a
+  `tests/DesignTokenTest.php` that never existed.
 - Every GitHub Action is pinned to a full commit SHA, with its release in a comment, in
   both workflows. Branch pushes run CI; a tag push runs it through the release workflow.
 - **`composer bump-version -- <patch|minor|major|x.y.z>`** (`scripts/bump-version.php`)

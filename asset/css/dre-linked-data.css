@@ -3,9 +3,10 @@
  *
  * Built on the DRE theme's token API (DRE-theme DESIGN.md and
  * docs/DESIGN-INTEGRATION.md). Every var() carries the theme's own value from
- * dre-tokens-fallback.json as its fallback — tests/DesignTokenTest.php holds
- * them to it — so the block still renders sensibly outside the theme. There are
- * no mode branches: the semantic tokens already resolve for light and dark.
+ * dre-tokens-fallback.json as its fallback — `composer lint:tokens`
+ * (scripts/check-design-tokens.mjs) holds them to it — so the block still
+ * renders sensibly outside the theme. There are no mode branches: the semantic
+ * tokens already resolve for light and dark.
  *
  * The theme's own `.button`, `pre` and table rules are reused, not restyled;
  * the rules here add the block's layout, panels, count tiles and format chips.
