@@ -112,7 +112,7 @@ jobs:
           contents="$(unzip -Z1 DRELinkedData.zip)"
           fail=0
 
-          for required in DRELinkedData/Module.php DRELinkedData/config/module.ini DRELinkedData/composer.json DRELinkedData/LICENSE DRELinkedData/scripts/generate-dump.php DRELinkedData/language/template.pot; do
+          for required in DRELinkedData/Module.php DRELinkedData/config/module.ini DRELinkedData/config/identity-authorities.php DRELinkedData/composer.json DRELinkedData/LICENSE DRELinkedData/scripts/generate-dump.php DRELinkedData/language/template.pot; do
             if ! grep -qxF "$required" <<< "$contents"; then
               echo "::error::${required} is missing from the archive"
               fail=1

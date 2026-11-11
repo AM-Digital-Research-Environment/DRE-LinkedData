@@ -49,12 +49,15 @@ installed with Composer: `composer.json` has scripts and no dependencies.
   media only of a public item, links to anything private dropped), and the
   smoke test proves it against a private row. The unit tests use a fake source
   and cannot.
-- **Identity links are an allowlist** in `config/module.config.php`
-  (`dre_linked_data.projection.identity_links.authorities`). A new authority
-  needs a pattern, canonical form, label, dataset and uri_space, plus a case in
-  `tests/ConfigurationTest.php` on a URI shape the instance actually stores.
-  DRE SEO reads the result through the `dreLinkedData` view helper's `sameAs`
-  key, so a change here changes SEO's JSON-LD too.
+- **Identity links are an allowlist** in `config/identity-authorities.php`,
+  which `config/module.config.php` includes as
+  `dre_linked_data.projection.identity_links.authorities`. A new authority
+  needs a pattern, canonical form, label, dataset and uri_space, plus cases in
+  `tests/fixtures/identity-links.json` on a URI shape the instance actually
+  stores. DRE SEO reads the result through the `dreLinkedData` view helper's
+  `sameAs` key and, without this module, applies a byte-identical copy of the
+  table and the same cases. Both repositories pin both files' sha256: copy
+  them to DRE SEO and update the pins on both sides in the same change.
 - **The view helper is a cross-repository contract.** `dreLinkedData($resource)`
   (`src/View/Helper/LinkedData.php`) is read by DRE-theme's
   `helper/RecordLinkedData.php` and DRE SEO's `LinkedDataIdentity`; both guard

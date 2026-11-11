@@ -15,6 +15,25 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **One identity-link allowlist with DRE SEO.** The authorities moved from
+  `config/module.config.php` to `config/identity-authorities.php`, which the module config
+  includes under the same key (`projection.identity_links.authorities`, same shape) and DRE
+  SEO carries byte-identically for the `sameAs` it emits without this module. A shared table
+  of cases (`tests/fixtures/identity-links.json`) runs through `IdentityLinks` here and DRE
+  SEO's code there, and both repositories pin the two files by sha256. What the RDF, the
+  VoID linksets and the helper's `sameAs` gain or lose:
+  - **ISNI** is an authority: `https://isni.org/isni/…` identifiers become `owl:sameAs`
+    (or `skos:exactMatch`) links, with a VoID linkset and `#dataset-isni` target when any
+    occur;
+  - the patterns accept what the old ones rejected: an upper-case scheme or host,
+    `wikidata.org` and `m.wikidata.org` beside `www.`, `www.orcid.org`, `www.ror.org`, and a
+    trailing slash on Wikidata, Library of Congress, GND, ORCID and ROR URIs. Each is linked
+    as the authority's canonical IRI, as before;
+  - a GND id must have the GND shape (digits, optionally `X` or a hyphen and one check
+    character): `…/gnd/-` or `…/gnd/12-34` no longer link.
+
+  Every identifier URI on AMIRA's items today (5,108, checked on 11 November 2026) links as
+  before. The helper's keys and the configuration's shape are unchanged.
 - **Requires Omeka S 4.2.1** (`omeka_version_constraint = "^4.2.1"`), the release CI and the
   smoke test run against and the constraint the other DRE modules declare. 4.2.0 was never
   tested; a unit test now ties the constraint to the version CI checks.

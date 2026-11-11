@@ -16,10 +16,15 @@ namespace DRELinkedData\Projection;
  * Only configured authorities qualify. Authority items also carry YouTube
  * playlist and GEPRIS URLs under dcterms:identifier, and those are not the
  * same thing as the concept, so an allowlist rather than "any URI" is the rule.
+ * The allowlist is config/identity-authorities.php, which DRE SEO carries
+ * byte-identically for the JSON-LD `sameAs` it emits without this module.
+ * Only a URI value is matched: a literal, even one that spells an authority
+ * URL or a bare Wikidata id, is published as a literal and links nothing.
  *
  * DOIs are handled apart ({@see doi()}): they sit in their own property
  * (bibo:doi), identify the work's published version rather than the record,
- * and link with schema:sameAs.
+ * and link with schema:sameAs. DRE SEO implements the same rule; both run
+ * tests/fixtures/identity-links.json, so a change here is a change there.
  */
 final class IdentityLinks
 {

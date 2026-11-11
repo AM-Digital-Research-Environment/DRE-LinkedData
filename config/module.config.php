@@ -189,61 +189,14 @@ return [
                 'template_predicates' => [
                     6 => 'http://www.w3.org/2004/02/skos/core#exactMatch',
                 ],
-                // pattern: PCRE matched against the stored URI; canonical: its
-                // replacement (the authority's own entity IRI); dataset: the
-                // target dataset's homepage and uri_space its entity IRIs, both
-                // for the VoID linksets.
-                'authorities' => [
-                    'wikidata' => [
-                        'label' => 'Wikidata',
-                        'pattern' => '~^https?://www\.wikidata\.org/(?:entity|wiki)/(Q[1-9][0-9]*)$~',
-                        'canonical' => 'http://www.wikidata.org/entity/$1',
-                        'dataset' => 'https://www.wikidata.org/',
-                        'uri_space' => 'http://www.wikidata.org/entity/',
-                    ],
-                    'loc' => [
-                        'label' => 'Library of Congress',
-                        'pattern' => '~^https?://id\.loc\.gov/authorities/(subjects|names|genreForms)/([a-z]+[0-9]+)(?:\.html)?$~',
-                        'canonical' => 'http://id.loc.gov/authorities/$1/$2',
-                        'dataset' => 'http://id.loc.gov/',
-                        'uri_space' => 'http://id.loc.gov/authorities/',
-                    ],
-                    'gnd' => [
-                        'label' => 'GND',
-                        'pattern' => '~^https?://d-nb\.info/gnd/([0-9X-]+)$~',
-                        'canonical' => 'https://d-nb.info/gnd/$1',
-                        'dataset' => 'https://d-nb.info/gnd/',
-                        'uri_space' => 'https://d-nb.info/gnd/',
-                    ],
-                    'viaf' => [
-                        'label' => 'VIAF',
-                        'pattern' => '~^https?://(?:www\.)?viaf\.org/viaf/([0-9]+)/?$~',
-                        'canonical' => 'http://viaf.org/viaf/$1',
-                        'dataset' => 'http://viaf.org/',
-                        'uri_space' => 'http://viaf.org/viaf/',
-                    ],
-                    'orcid' => [
-                        'label' => 'ORCID',
-                        'pattern' => '~^https?://orcid\.org/([0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X])$~',
-                        'canonical' => 'https://orcid.org/$1',
-                        'dataset' => 'https://orcid.org/',
-                        'uri_space' => 'https://orcid.org/',
-                    ],
-                    'ror' => [
-                        'label' => 'ROR',
-                        'pattern' => '~^https?://ror\.org/(0[a-z0-9]{8})$~',
-                        'canonical' => 'https://ror.org/$1',
-                        'dataset' => 'https://ror.org/',
-                        'uri_space' => 'https://ror.org/',
-                    ],
-                    'geonames' => [
-                        'label' => 'GeoNames',
-                        'pattern' => '~^https?://(?:www\.|sws\.)?geonames\.org/([0-9]+)(?:/.*)?$~',
-                        'canonical' => 'https://sws.geonames.org/$1/',
-                        'dataset' => 'https://www.geonames.org/',
-                        'uri_space' => 'https://sws.geonames.org/',
-                    ],
-                ],
+                // The allowlist: config/identity-authorities.php, which DRE SEO
+                // carries byte-identically, so a record's sameAs is the same
+                // whichever module names it. Each authority has a pattern (PCRE
+                // matched against the stored URI), canonical (its replacement,
+                // the authority's own entity IRI), label, dataset (the target
+                // dataset's homepage) and uri_space (its entity IRIs), the last
+                // two for the VoID linksets. Edit that file, not this key.
+                'authorities' => require __DIR__ . '/identity-authorities.php',
                 // DOIs: the properties that hold one, stored as a bare DOI or a
                 // resolver URL. Each is published as the bare DOI literal (what
                 // bibo:doi expects) plus a link to its https://doi.org/ IRI.

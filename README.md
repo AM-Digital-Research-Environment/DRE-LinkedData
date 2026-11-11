@@ -152,7 +152,7 @@ even when a value is marked public by mistake. An uploaded file's original name 
 sideloaded file's server path are never published either.
 
 **Identity links.** URI values of `dcterms:identifier` are checked against an allowlist of
-authorities (`config/module.config.php`). The canonical entity IRI is added beside the
+authorities (`config/identity-authorities.php`). The canonical entity IRI is added beside the
 original value:
 
 | Authority | Stored as, for example | Linked as |
@@ -160,7 +160,19 @@ original value:
 | Wikidata | `http://www.wikidata.org/entity/Q408`, `https://www.wikidata.org/wiki/Q707283` | `http://www.wikidata.org/entity/Q…` |
 | Library of Congress | `http://id.loc.gov/authorities/subjects/sh85149367` | the same, without `.html` |
 | GND | `https://d-nb.info/gnd/124120881` | the same |
-| VIAF, ORCID, ROR, GeoNames | their usual URL forms | their entity IRIs |
+| VIAF, ORCID, ISNI, ROR, GeoNames | their usual URL forms | their entity IRIs |
+
+The patterns are tolerant of how a URI was typed and strict about what it names: http or
+https, the host in any case, the `www.`, `m.` or `sws.` host the authority itself uses and a
+trailing slash are all accepted, while the id is case-sensitive and a query or fragment is
+no match. The link is always the authority's canonical IRI. A literal is never a link, even
+one that spells an authority URL or a bare Wikidata id.
+
+DRE SEO carries a byte-identical copy of `config/identity-authorities.php` for the JSON-LD
+`sameAs` it builds when this module is absent, so a record's `sameAs` does not change the day
+this module is switched on. Both repositories run the same cases
+(`tests/fixtures/identity-links.json`) through their own code and pin the sha256 of both
+files: change them here, copy them to DRE SEO, and update the pins on both sides.
 
 The predicate is `owl:sameAs` for entities: persons, places, organisations and journals.
 Items on the Authority Resource template (template 6: subjects, languages, genres) are
@@ -396,7 +408,8 @@ production runtime, 8.5.
 | Metadata licence | A licence URI (e.g. `https://creativecommons.org/publicdomain/zero/1.0/`), stated on every document and the dump. **Nothing is claimed while this is empty.** |
 | Generate the dump now | Starts the dump job on save. |
 
-Structural choices — excluded terms, authority patterns and DOI properties, which template
+Structural choices — excluded terms, authority patterns (kept in
+`config/identity-authorities.php`, shared with DRE SEO) and DOI properties, which template
 is "concepts", class replacements and the fallback class, list, decimal and literal-range
 properties, the classes added to item sets and media, the batch size, the dataset keywords —
 are in the `dre_linked_data` block of

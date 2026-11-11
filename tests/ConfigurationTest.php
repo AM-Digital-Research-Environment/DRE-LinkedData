@@ -4,6 +4,7 @@ declare(strict_types=1);
 use DRELinkedData\Projection\IdentityLinks;
 use DRELinkedData\Projection\SameAs;
 use DRELinkedData\Rdf\Format;
+use DRELinkedData\Rdf\Iri;
 use DRELinkedData\Settings\DatasetSettings;
 
 test('authority patterns accept the identifier shapes AMIRA stores, in canonical form', function (): void {
@@ -75,6 +76,80 @@ test('DOIs are recognised in every stored shape and nothing else', function (): 
     }
     assertTrue($links->holdsDoi('bibo:doi'));
     assertTrue(!$links->holdsDoi('dcterms:identifier'));
+});
+
+test('identity links follow the cases DRE SEO runs too, as the helper reports them', function (): void {
+    $links = new IdentityLinks(moduleConfig()['projection']['identity_links']);
+    $cases = json_decode((string) file_get_contents(__DIR__ . '/fixtures/identity-links.json'), true, 512, JSON_THROW_ON_ERROR);
+    assertTrue(count($cases['identifier']) > 50 && count($cases['doi']) > 10, 'the shared fixture must load');
+    $seen = [];
+    foreach ($cases['identifier'] as ['input' => $input, 'expected' => $expected]) {
+        $match = $links->match($input, null);
+        assertSameValue($expected, $match !== null ? (new Iri($match['iri']))->value : null, 'identifier ' . $input);
+        $link = $links->linkFor('dcterms:identifier', $input, null, null);
+        assertSameValue($expected, $link !== null ? (new Iri($link['iri']))->value : null, 'linkFor ' . $input);
+        if ($match !== null) {
+            $seen[$match['authority']] = true;
+        }
+    }
+    foreach ($cases['doi'] as ['input' => $input, 'expected' => $expected]) {
+        $doi = $links->doi($input);
+        assertSameValue($expected, $doi !== null ? (new Iri($doi['iri']))->value : null, 'doi ' . $input);
+        $link = $links->linkFor('bibo:doi', $input, null, null);
+        assertSameValue($expected, $link !== null ? (new Iri($link['iri']))->value : null, 'bibo:doi ' . $input);
+    }
+    $authorities = array_keys(moduleConfig()['projection']['identity_links']['authorities']);
+    sort($authorities);
+    ksort($seen);
+    assertSameValue($authorities, array_keys($seen), 'every authority has a case that matches');
+});
+
+test('the authority table and the shared cases are DRE SEO\'s, byte for byte', function (): void {
+    // DRE SEO pins the same two hashes (tests/Config/IdentityAuthoritiesTest.php).
+    // A change to either file lands in both repositories, with both pins updated.
+    $root = dirname(__DIR__);
+    assertSameValue(
+        'e29e37c8381076a8deaa14aac62d25acdc99b2753c97b7c6ed7c6581974ecb5f',
+        hash_file('sha256', $root . '/config/identity-authorities.php'),
+        'config/identity-authorities.php'
+    );
+    assertSameValue(
+        'e17eec50b0c358fb9fd4ab5a3d334077ea3e77960d66e9d0acbc16eca0c6300f',
+        hash_file('sha256', $root . '/tests/fixtures/identity-links.json'),
+        'tests/fixtures/identity-links.json'
+    );
+    $config = (string) file_get_contents($root . '/config/module.config.php');
+    assertTrue(str_contains($config, "'authorities' => require __DIR__ . '/identity-authorities.php',"), 'the module config reads the shared table');
+});
+
+test('a resource\'s sameAs is the list DRE SEO\'s fallback gives for the same values', function (): void {
+    // The same values as DRE SEO's StructuredDataTest::testTheFallbackSameAsIsDRELinkedDatas().
+    $source = new FakeSource();
+    $source->propertyMap = [
+        10 => ['iri' => 'http://purl.org/dc/terms/identifier', 'term' => 'dcterms:identifier'],
+        20 => ['iri' => 'http://purl.org/ontology/bibo/doi', 'term' => 'bibo:doi'],
+        30 => ['iri' => 'https://dre.uni-bayreuth.de/vocab#rdspaceHandle', 'term' => 'dre:rdspaceHandle'],
+    ];
+    $row = static fn (int $property, ?string $value, ?string $uri): array => [
+        'resource_id' => 500, 'property_id' => $property, 'value_resource_id' => null, 'value' => $value, 'uri' => $uri,
+    ];
+    $source->valueRows = [
+        $row(10, 'Q1189283', 'https://www.wikidata.org/wiki/Q1189283'),
+        $row(10, 'ORCID', 'http://www.orcid.org/0000-0002-1694-233X/'),
+        $row(10, 'Q42', null),
+        $row(10, null, 'https://doi.org/10.1017/S0021853721000372'),
+        $row(10, null, 'https://www.youtube.com/playlist?list=PL123'),
+        $row(10, null, 'https://isni.org/isni/000000012146438X'),
+        $row(20, '10.1000/abc#def', 'https://doi.org/10.1000/abc%23def'),
+        $row(30, 'rdspace-ubt/295', 'https://rdspace.uni-bayreuth.de/handle/rdspace-ubt/295'),
+    ];
+    $sameAs = new SameAs($source, new IdentityLinks(moduleConfig()['projection']['identity_links']));
+    assertSameValue([
+        'http://www.wikidata.org/entity/Q1189283',
+        'https://orcid.org/0000-0002-1694-233X',
+        'https://isni.org/isni/000000012146438X',
+        'https://doi.org/10.1000/abc%23def',
+    ], $sameAs->of(500, 3));
 });
 
 test('private sync and access-control terms, and full texts, are on the exclusion list', function (): void {

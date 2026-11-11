@@ -57,9 +57,12 @@ checksum-pinned Omeka S 4.2.1. Please run `composer check` before pushing, and
   follow the existing pattern rather than reaching for PHPUnit.
 - **Visibility lives in SQL** (`Projection\OmekaSource`). Any new query that reaches the
   public must apply the same rule, and the smoke test must prove it against a private row.
-- A new authority belongs in `config/module.config.php` with a pattern, a canonical form, a
-  label and a target dataset, and a case in `tests/ConfigurationTest.php` using a URI shape
-  the instance actually stores.
+- A new authority belongs in `config/identity-authorities.php` with a pattern, a canonical
+  form, a label, a target dataset and its URI space, and cases in
+  `tests/fixtures/identity-links.json` using a URI shape the instance actually stores, plus
+  near-misses that must be rejected. DRE SEO carries byte-identical copies of both files:
+  copy them over and update the sha256 pins in `tests/ConfigurationTest.php` here and
+  `tests/Config/IdentityAuthoritiesTest.php` there (SEO keeps the cases in `tests/Fixture/`).
 - The page block uses the DRE theme's tokens only. `var(--token, fallback)` fallbacks must be
   the theme's own values: `composer lint:tokens` checks them against the table vendored from
   DRE-theme. Refresh that table from DRE-theme with
