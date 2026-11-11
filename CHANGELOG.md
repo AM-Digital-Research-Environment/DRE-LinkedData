@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-11
+
 ### Added
 
 - `language/template.pot`, the translation template: every string the module wraps in
@@ -273,7 +275,8 @@ All notable changes to this project are documented here. The format follows
 - Unit tests, an Omeka S 4.2.1 integration smoke test that parses every serialisation with
   EasyRdf and ml/json-ld, the DRE design-token lint, and CI and release workflows.
 
-[Unreleased]: https://github.com/AM-Digital-Research-Environment/DRE-LinkedData/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/AM-Digital-Research-Environment/DRE-LinkedData/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/AM-Digital-Research-Environment/DRE-LinkedData/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/AM-Digital-Research-Environment/DRE-LinkedData/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/AM-Digital-Research-Environment/DRE-LinkedData/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/AM-Digital-Research-Environment/DRE-LinkedData/compare/v0.3.1...v0.4.0
