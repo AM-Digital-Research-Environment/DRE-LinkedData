@@ -30,10 +30,149 @@ final class DatasetSummary
         SPARQL;
 
     /**
+     * The kinds of record, for the page block's "How the data is modelled"
+     * section: what each is called, the classes it carries, and the key of
+     * its named graph in the N-Quads dump (config dump.graphs).
+     *
+     * @var list<array{label:string,classes:string,graph:string}>
+     */
+    public const MODEL_KINDS = [
+        [
+            'label' => 'Research items', // @translate
+            'classes' => 'schema:CreativeWork, dre:ResearchItem, dctype:Text, dctype:Sound, …',
+            'graph' => 'research-items',
+        ],
+        [
+            'label' => 'Publications', // @translate
+            'classes' => 'fabio:JournalArticle, fabio:Book, fabio:BookChapter, fabio:WorkingPaper, …',
+            'graph' => 'publications',
+        ],
+        [
+            'label' => 'Persons', // @translate
+            'classes' => 'foaf:Person',
+            'graph' => 'persons',
+        ],
+        [
+            'label' => 'Organisations', // @translate
+            'classes' => 'foaf:Organization',
+            'graph' => 'organisations',
+        ],
+        [
+            'label' => 'Research sections', // @translate
+            'classes' => 'frapo:ResearchGroup',
+            'graph' => 'research-sections',
+        ],
+        [
+            'label' => 'Projects', // @translate
+            'classes' => 'foaf:Project',
+            'graph' => 'projects',
+        ],
+        [
+            'label' => 'Subjects, languages, genres and other concepts', // @translate
+            'classes' => 'skos:Concept, skos:inScheme its list',
+            'graph' => 'concepts',
+        ],
+        [
+            'label' => 'Places', // @translate
+            'classes' => 'dcterms:Location',
+            'graph' => 'places',
+        ],
+        [
+            'label' => 'Journals and series', // @translate
+            'classes' => 'bibo:Journal, bibo:Series',
+            'graph' => 'venues',
+        ],
+        [
+            'label' => 'Podcasts, videos, Cluster Chronicles', // @translate
+            'classes' => 'fabio:AudioDocument, bibo:AudioVisualDocument, fabio:Essay, …',
+            'graph' => 'podcasts, videos, chronicles',
+        ],
+        [
+            'label' => 'Item sets', // @translate
+            'classes' => 'dctype:Collection',
+            'graph' => 'item-sets',
+        ],
+        [
+            'label' => 'Media (files)', // @translate
+            'classes' => 'schema:MediaObject',
+            'graph' => 'media',
+        ],
+    ];
+
+    /**
+     * The predicates that link records, for the same section: the property,
+     * what it links, and what it means.
+     *
+     * @var list<array{predicate:string,links:string,meaning:string}>
+     */
+    public const MODEL_LINKS = [
+        [
+            'predicate' => 'dcterms:creator, dcterms:contributor',
+            'links' => 'record → person or organisation', // @translate
+            'meaning' => 'Anyone involved, whatever the role: creator for authors, artists, interviewers and other creators, contributor for every other role.', // @translate
+        ],
+        [
+            'predicate' => 'marcrel:aut, marcrel:rtm, marcrel:ivr, marcrel:spn, …',
+            'links' => 'record → person or organisation', // @translate
+            'meaning' => 'The precise role (author, research team member, interviewer, sponsor, …), from the MARC relators.', // @translate
+        ],
+        [
+            'predicate' => 'bibo:authorList, bibo:editorList',
+            'links' => 'publication → list of persons', // @translate
+            'meaning' => 'Authors and editors in their published order, as an rdf:List.', // @translate
+        ],
+        [
+            'predicate' => 'dcterms:isPartOf',
+            'links' => 'research item → project; project → research section; publication → journal, book or series; place → country; person → institution', // @translate
+            'meaning' => 'The record\'s immediate whole.', // @translate
+        ],
+        [
+            'predicate' => 'dcterms:subject',
+            'links' => 'record → concept, person, organisation or place', // @translate
+            'meaning' => 'What the record is about.', // @translate
+        ],
+        [
+            'predicate' => 'dcterms:spatial',
+            'links' => 'record → place', // @translate
+            'meaning' => 'Place of origin.', // @translate
+        ],
+        [
+            'predicate' => 'dcterms:provenance',
+            'links' => 'research item → organisation or place', // @translate
+            'meaning' => 'Where the original is held now.', // @translate
+        ],
+        [
+            'predicate' => 'frapo:isFundedBy',
+            'links' => 'record or project → organisation', // @translate
+            'meaning' => 'Funder.', // @translate
+        ],
+        [
+            'predicate' => 'dcterms:type, dcterms:language, dcterms:format, dcterms:audience',
+            'links' => 'record → concept', // @translate
+            'meaning' => 'Type of resource, language, genre, target audience.', // @translate
+        ],
+        [
+            'predicate' => 'foaf:member',
+            'links' => 'project or research section → person', // @translate
+            'meaning' => 'Member; dcterms:creator on a project names its principal investigators.', // @translate
+        ],
+        [
+            'predicate' => 'schema:isPartOf, schema:associatedMedia',
+            'links' => 'item → item set; item → media', // @translate
+            'meaning' => 'The item sets it belongs to and its files.', // @translate
+        ],
+        [
+            'predicate' => 'owl:sameAs, skos:exactMatch',
+            'links' => 'entity or concept → Wikidata, GND, Library of Congress, ORCID, …', // @translate
+            'meaning' => 'The same entity, or a matching concept, in another dataset.', // @translate
+        ],
+    ];
+
+    /**
      * The examples the page block offers, the first shown by default. Each
-     * declares its own prefixes so it runs as copied, and each reads only what
-     * the projection always writes (classes, labels, subject and place links,
-     * owl:sameAs identity links).
+     * declares its own prefixes so it runs as copied. Most follow links
+     * between records: from a person, a project, a subject or a place to the
+     * records that point at them.
      *
      * @var list<array{label:string,query:string}>
      */
@@ -41,6 +180,107 @@ final class DatasetSummary
         [
             'label' => 'Resources by class', // @translate
             'query' => self::EXAMPLE_QUERY,
+        ],
+        [
+            'label' => 'Everything linked to a person, whatever the role', // @translate
+            'query' => <<<'SPARQL'
+                PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+                PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+                # Every predicate that points at the person: each role (author,
+                # translator, …), subject, membership. Change the name to try another.
+                SELECT ?record ?title ?role
+                WHERE {
+                  ?person a foaf:Person ;
+                    rdfs:label "Beier, Ulli" .
+                  ?record ?role ?person .
+                  FILTER(?role != rdf:first)
+                  OPTIONAL { ?record rdfs:label ?title }
+                }
+                ORDER BY ?role ?title
+                LIMIT 200
+                SPARQL,
+        ],
+        [
+            'label' => 'The records of a project', // @translate
+            'query' => <<<'SPARQL'
+                PREFIX dcterms: <http://purl.org/dc/terms/>
+                PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+                # Research items point at their project with dcterms:isPartOf.
+                SELECT ?record ?title ?type
+                WHERE {
+                  ?project a foaf:Project ;
+                    rdfs:label "Taiwo Shango" .
+                  ?record dcterms:isPartOf ?project ;
+                    rdfs:label ?title .
+                  OPTIONAL { ?record dcterms:type/rdfs:label ?type }
+                }
+                ORDER BY ?title
+                LIMIT 200
+                SPARQL,
+        ],
+        [
+            'label' => 'Projects and their number of records', // @translate
+            'query' => <<<'SPARQL'
+                PREFIX dcterms: <http://purl.org/dc/terms/>
+                PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+                SELECT ?project ?title (COUNT(?record) AS ?records)
+                WHERE {
+                  ?project a foaf:Project ;
+                    rdfs:label ?title .
+                  ?record dcterms:isPartOf ?project .
+                }
+                GROUP BY ?project ?title
+                ORDER BY DESC(?records)
+                LIMIT 50
+                SPARQL,
+        ],
+        [
+            'label' => 'Everyone who worked on a project\'s records', // @translate
+            'query' => <<<'SPARQL'
+                PREFIX dcterms: <http://purl.org/dc/terms/>
+                PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+                # dcterms:creator and dcterms:contributor stand for every role.
+                SELECT ?agent ?name (COUNT(DISTINCT ?record) AS ?records)
+                WHERE {
+                  ?project a foaf:Project ;
+                    rdfs:label "Taiwo Shango" .
+                  ?record dcterms:isPartOf ?project ;
+                    dcterms:creator|dcterms:contributor ?agent .
+                  ?agent rdfs:label ?name .
+                }
+                GROUP BY ?agent ?name
+                ORDER BY ?name
+                SPARQL,
+        ],
+        [
+            'label' => 'Projects by research section, with their investigators', // @translate
+            'query' => <<<'SPARQL'
+                PREFIX dcterms: <http://purl.org/dc/terms/>
+                PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+                PREFIX frapo: <http://purl.org/cerif/frapo/>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+                SELECT ?section ?project ?title
+                  (GROUP_CONCAT(DISTINCT ?name; separator=" · ") AS ?investigators)
+                WHERE {
+                  ?project a foaf:Project ;
+                    rdfs:label ?title ;
+                    dcterms:isPartOf ?group .
+                  ?group a frapo:ResearchGroup ;
+                    rdfs:label ?section .
+                  OPTIONAL { ?project dcterms:creator/rdfs:label ?name }
+                }
+                GROUP BY ?section ?project ?title
+                ORDER BY ?section ?title
+                SPARQL,
         ],
         [
             'label' => 'Most frequent subjects', // @translate
@@ -59,19 +299,140 @@ final class DatasetSummary
                 SPARQL,
         ],
         [
-            'label' => 'Most frequent places', // @translate
+            'label' => 'Records about a subject', // @translate
+            'query' => <<<'SPARQL'
+                PREFIX dcterms: <http://purl.org/dc/terms/>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+
+                # Every subject heading containing the word, and its records.
+                SELECT ?record ?title ?subject ?heading
+                WHERE {
+                  ?subject a skos:Concept ;
+                    skos:prefLabel ?heading .
+                  FILTER(CONTAINS(LCASE(?heading), "music"))
+                  ?record dcterms:subject ?subject ;
+                    rdfs:label ?title .
+                }
+                ORDER BY ?heading ?title
+                LIMIT 200
+                SPARQL,
+        ],
+        [
+            'label' => 'Subjects that occur together', // @translate
+            'query' => <<<'SPARQL'
+                PREFIX dcterms: <http://purl.org/dc/terms/>
+                PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+
+                SELECT ?first ?second (COUNT(DISTINCT ?record) AS ?records)
+                WHERE {
+                  ?record dcterms:subject ?a, ?b .
+                  ?a skos:prefLabel ?first .
+                  ?b skos:prefLabel ?second .
+                  FILTER(STR(?a) < STR(?b))
+                }
+                GROUP BY ?first ?second
+                ORDER BY DESC(?records)
+                LIMIT 25
+                SPARQL,
+        ],
+        [
+            'label' => 'Places of origin, with coordinates', // @translate
+            'query' => <<<'SPARQL'
+                PREFIX dcterms: <http://purl.org/dc/terms/>
+                PREFIX geo: <http://www.w3.org/2003/01/geo/wgs84_pos#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+                SELECT ?place ?name ?lat ?long (COUNT(?record) AS ?records)
+                WHERE {
+                  ?record dcterms:spatial ?place .
+                  ?place a dcterms:Location ;
+                    rdfs:label ?name ;
+                    geo:lat ?lat ;
+                    geo:long ?long .
+                }
+                GROUP BY ?place ?name ?lat ?long
+                ORDER BY DESC(?records)
+                LIMIT 100
+                SPARQL,
+        ],
+        [
+            'label' => 'Where research items are held', // @translate
             'query' => <<<'SPARQL'
                 PREFIX dcterms: <http://purl.org/dc/terms/>
                 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
-                SELECT ?place ?label (COUNT(?record) AS ?records)
+                # dcterms:provenance is the current location: an institution or a place.
+                SELECT ?holder ?name ?kind (COUNT(?record) AS ?records)
                 WHERE {
-                  ?record dcterms:spatial ?place .
-                  ?place rdfs:label ?label .
+                  ?record dcterms:provenance ?holder .
+                  ?holder rdfs:label ?name ;
+                    a ?kind .
                 }
-                GROUP BY ?place ?label
+                GROUP BY ?holder ?name ?kind
                 ORDER BY DESC(?records)
-                LIMIT 25
+                LIMIT 50
+                SPARQL,
+        ],
+        [
+            'label' => 'Research items by type', // @translate
+            'query' => <<<'SPARQL'
+                PREFIX dcterms: <http://purl.org/dc/terms/>
+                PREFIX dre: <https://data.africamultiple.uni-bayreuth.de/ontology/dre#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+                # The Type of Resource, and the DCMI Type class it maps to.
+                SELECT ?type ?dcmiType (COUNT(?item) AS ?items)
+                WHERE {
+                  ?item a dre:ResearchItem ;
+                    dcterms:type/rdfs:label ?type .
+                  OPTIONAL {
+                    ?item a ?dcmiType .
+                    FILTER(STRSTARTS(STR(?dcmiType), "http://purl.org/dc/dcmitype/"))
+                  }
+                }
+                GROUP BY ?type ?dcmiType
+                ORDER BY DESC(?items)
+                SPARQL,
+        ],
+        [
+            'label' => 'Publications and their authors', // @translate
+            'query' => <<<'SPARQL'
+                PREFIX bibo: <http://purl.org/ontology/bibo/>
+                PREFIX dcterms: <http://purl.org/dc/terms/>
+                PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                PREFIX schema: <https://schema.org/>
+
+                # The publications item set; authors from the ordered author list.
+                SELECT ?publication ?title ?date
+                  (GROUP_CONCAT(?name; separator=" · ") AS ?authors)
+                WHERE {
+                  ?publication schema:isPartOf <https://data.africamultiple.uni-bayreuth.de/resource/29918> ;
+                    rdfs:label ?title ;
+                    bibo:authorList/rdf:rest*/rdf:first ?author .
+                  ?author rdfs:label ?name .
+                  OPTIONAL { ?publication dcterms:date ?date }
+                }
+                GROUP BY ?publication ?title ?date
+                ORDER BY DESC(?date) ?title
+                LIMIT 100
+                SPARQL,
+        ],
+        [
+            'label' => 'Records matched to Wikidata, by class', // @translate
+            'query' => <<<'SPARQL'
+                PREFIX owl: <http://www.w3.org/2002/07/owl#>
+                PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+
+                SELECT ?class (COUNT(DISTINCT ?entity) AS ?matched)
+                WHERE {
+                  ?entity owl:sameAs|skos:exactMatch ?wikidata ;
+                    a ?class .
+                  FILTER(STRSTARTS(STR(?wikidata), "http://www.wikidata.org/entity/"))
+                }
+                GROUP BY ?class
+                ORDER BY DESC(?matched)
                 SPARQL,
         ],
         [
@@ -93,18 +454,16 @@ final class DatasetSummary
                 SPARQL,
         ],
         [
-            'label' => 'Resources linked to Wikidata', // @translate
+            'label' => 'Named graphs and their size', // @translate
             'query' => <<<'SPARQL'
-                PREFIX owl: <http://www.w3.org/2002/07/owl#>
-                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
-                SELECT ?resource ?label ?wikidata
+                # One named graph per kind of record. Without GRAPH, a query
+                # reads them all together.
+                SELECT ?graph (COUNT(*) AS ?triples)
                 WHERE {
-                  ?resource owl:sameAs ?wikidata ;
-                    rdfs:label ?label .
-                  FILTER(STRSTARTS(STR(?wikidata), "http://www.wikidata.org/entity/"))
+                  GRAPH ?graph { ?s ?p ?o }
                 }
-                LIMIT 100
+                GROUP BY ?graph
+                ORDER BY DESC(?triples)
                 SPARQL,
         ],
     ];
@@ -246,6 +605,13 @@ final class DatasetSummary
             'void' => Format::documents(fn (Format $format): string => $this->uris->voidDocument($format)),
             'voidUrl' => $this->uris->voidDocument(),
             'uriPattern' => $this->uris->resourceSpace() . '{id}',
+            // "How the data is modelled": the kinds of record and the links
+            // between them, plus the pattern of the named graphs' names.
+            'model' => [
+                'kinds' => self::MODEL_KINDS,
+                'links' => self::MODEL_LINKS,
+                'graphPattern' => $this->uris->voidDocument() . '#graph-{name}',
+            ],
             'example' => $example,
             'linksets' => $linksets,
             'vocabularies' => $vocabularies,

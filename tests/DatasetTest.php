@@ -396,3 +396,26 @@ test('the summary and the helper offer the N-Quads dump after the N-Triples one'
         removeDirectory($dir);
     }
 });
+
+test('the modelling guide names only configured graphs and declared prefixes', function (): void {
+    $graphs = moduleConfig()['dump']['graphs']['list'];
+    $named = [];
+    foreach (DatasetSummary::MODEL_KINDS as $kind) {
+        foreach (explode(', ', $kind['graph']) as $graph) {
+            assertTrue(isset($graphs[$graph]), $kind['label'] . ' names an unknown graph: ' . $graph);
+            $named[$graph] = true;
+        }
+    }
+    assertSameValue([], array_values(array_diff(array_keys($graphs), array_keys($named), ['other'])), 'every graph but the default is explained');
+    $known = array_merge(array_keys(DRELinkedData\Rdf\Vocab::PREFIXES), ['bibo', 'fabio', 'frapo', 'marcrel', 'dre', 'geo']);
+    foreach (array_merge(array_column(DatasetSummary::MODEL_KINDS, 'classes'), array_column(DatasetSummary::MODEL_LINKS, 'predicate')) as $terms) {
+        preg_match_all('/\b([a-z]+):\w/', $terms, $used);
+        foreach ($used[1] as $prefix) {
+            assertTrue(in_array($prefix, $known, true), "{$terms} uses an unknown prefix {$prefix}");
+        }
+    }
+    $model = (new DatasetSummary(new DumpStore(sys_get_temp_dir() . '/dre-ld-none'), new UriScheme(FIXTURE_BASE), new IdentityLinks(moduleConfig()['projection']['identity_links']), static fn (): PrefixMap => new PrefixMap()))
+        ->build(new DatasetSettings('AMIRA', '', '', null, null))['model'];
+    assertSameValue(FIXTURE_BASE . '/linked-data/void#graph-{name}', $model['graphPattern']);
+    assertSameValue(DatasetSummary::MODEL_LINKS, $model['links']);
+});

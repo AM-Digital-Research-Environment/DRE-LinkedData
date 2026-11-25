@@ -458,6 +458,27 @@
     text-align: end;
 }
 
+/* ── How the data is modelled ──────────────────────────────────────────── */
+
+.dre-ld__table caption {
+    padding-block-end: var(--space-2, 0.5rem);
+    color: var(--ink-strong, #261d15);
+    font-weight: 600;
+    text-align: start;
+}
+
+/* Class lists and predicate names are long unbroken tokens: let them wrap
+   inside their cell at 320px rather than widen the table. */
+.dre-ld__model .dre-ld__table th,
+.dre-ld__model .dre-ld__table td {
+    overflow-wrap: anywhere;
+    vertical-align: top;
+}
+
+.dre-ld__model .dre-ld__table tbody th {
+    font-weight: 600;
+}
+
 /* ── Vocabularies (reference material, collapsed) ─────────────────────── */
 
 .dre-ld__vocabularies {

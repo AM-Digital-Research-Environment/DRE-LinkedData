@@ -741,7 +741,7 @@ try {
     smokeAssert(@$dom->loadHTML('<?xml encoding="utf-8"?>' . $html), 'The block template is not parseable HTML.');
     // escapeHtmlAttr() entity-encodes every URL character; compare decoded.
     $text = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    foreach (['class="dre-ld"', 'Download N-Triples', 'href="' . $base . '/linked-data/dump.nt.gz"', $base . '/resource/{id}', 'curl -L -H "Accept: text/turtle" ' . $base . '/resource/7', 'Wikidata', 'owl:sameAs', 'Dump is out of date (2 changes since', 'RDF/XML'] as $expected) {
+    foreach (['class="dre-ld"', 'Download N-Triples', 'href="' . $base . '/linked-data/dump.nt.gz"', $base . '/resource/{id}', 'curl -L -H "Accept: text/turtle" ' . $base . '/resource/7', 'Wikidata', 'owl:sameAs', 'Dump is out of date (2 changes since', 'RDF/XML', 'How the data is modelled', 'dre:ResearchItem', 'dcterms:creator, dcterms:contributor', 'Download N-Quads', 'href="' . $base . '/linked-data/dump.nq.gz"'] as $expected) {
         smokeAssert(str_contains($text, $expected), "The block lacks: {$expected}");
     }
     smokeAssert(!str_contains($text, 'Query with SPARQL'), 'The SPARQL panel must stay hidden without an endpoint.');

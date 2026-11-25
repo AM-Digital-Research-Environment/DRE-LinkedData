@@ -13,8 +13,24 @@ msgstr ""
 "Language: \n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "A graph's full name is its short name in this pattern:"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Anyone involved, whatever the role: creator for authors, artists, interviewers and other creators, contributor for every other role."
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Authors and editors in their published order, as an rdf:List."
+msgstr ""
+
 #: src/Form/ConfigForm.php
 msgid "Base URI"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Classes"
 msgstr ""
 
 #: src/Form/ConfigForm.php
@@ -98,11 +114,27 @@ msgid "Enter an email address."
 msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml
+msgid "Every link points at another resource URI, never at a plain name. To find everything that points at a record, whatever the predicate, ask for ?record ?predicate followed by its URI."
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
 msgid "Every public item, item set and media has a permanent identifier:"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Every record, whatever its kind, is a resource with a URI of the same form. Its class (rdf:type) says what kind of record it is, and in the N-Quads dump each kind also sits in a named graph of its own. A query without GRAPH reads all of them together."
 msgstr ""
 
 #: src/Form/ConfigForm.php
 msgid "Every resource is identified as {base}/resource/{id}. Identifiers are meant to be permanent: set this once to the public address of the site (no trailing slash) and do not change it afterwards. Leave empty to use the address Omeka is currently reached at."
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Everyone who worked on a project's records"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Everything linked to a person, whatever the role"
 msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml
@@ -125,6 +157,14 @@ msgstr ""
 msgid "Example:"
 msgstr ""
 
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "From → to"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Funder."
+msgstr ""
+
 #: src/Form/ConfigForm.php
 msgid "Generate the dump now"
 msgstr ""
@@ -138,11 +178,28 @@ msgid "Heading"
 msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml
+msgid "How records link to each other"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "How the data is modelled"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+#: view/common/block-layout/dre-linked-data.phtml
 msgid "Item sets"
 msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml
 msgid "Items"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Journals and series"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Kinds of record"
 msgstr ""
 
 #: view/dre-linked-data/admin/status.phtml
@@ -174,7 +231,19 @@ msgid "Loading…"
 msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml
+msgid "Meaning"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
 msgid "Media"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Media (files)"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Member; dcterms:creator on a project names its principal investigators."
 msgstr ""
 
 #: src/Form/ConfigForm.php
@@ -183,11 +252,15 @@ msgid "Metadata licence"
 msgstr ""
 
 #: src/Dataset/DatasetSummary.php
-msgid "Most frequent places"
+msgid "Most frequent subjects"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Named graph"
 msgstr ""
 
 #: src/Dataset/DatasetSummary.php
-msgid "Most frequent subjects"
+msgid "Named graphs and their size"
 msgstr ""
 
 #: Module.php
@@ -235,11 +308,59 @@ msgid "Optional. The public item used to demonstrate the URI pattern. By default
 msgstr ""
 
 #: src/Dataset/DatasetSummary.php
+msgid "Organisations"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
 msgid "People with an ORCID iD"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Persons"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Place of origin."
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Places"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Places of origin, with coordinates"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Podcasts, videos, Cluster Chronicles"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "Predicate"
 msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml
 msgid "Preparing the download…"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Projects"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Projects and their number of records"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Projects by research section, with their investigators"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Publications"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Publications and their authors"
 msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml
@@ -267,15 +388,35 @@ msgid "Query with SPARQL"
 msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml
+msgid "Records"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Records about a subject"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Records matched to Wikidata, by class"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Research items"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Research items by type"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Research sections"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
 msgid "Resource URIs"
 msgstr ""
 
 #: src/Dataset/DatasetSummary.php
 msgid "Resources by class"
-msgstr ""
-
-#: src/Dataset/DatasetSummary.php
-msgid "Resources linked to Wikidata"
 msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml
@@ -300,6 +441,14 @@ msgstr ""
 
 #: src/Form/ConfigForm.php
 msgid "Starts a background job that rewrites the N-Triples dump and the figures in the dataset description. Run it after a sync (or schedule scripts/generate-dump.php): individual resource documents are always live, the dump is not."
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Subjects that occur together"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Subjects, languages, genres and other concepts"
 msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml
@@ -330,12 +479,20 @@ msgstr ""
 msgid "The full data dump has not been published yet. Every public record is already available as Linked Data through its resource URI, described below."
 msgstr ""
 
+#: src/Dataset/DatasetSummary.php
+msgid "The item sets it belongs to and its files."
+msgstr ""
+
 #: src/Form/ConfigForm.php
 msgid "The licence URI for the published metadata, e.g. https://creativecommons.org/publicdomain/zero/1.0/ or https://creativecommons.org/licenses/by/4.0/. It is stated on every RDF document and on the dump. Nothing is claimed while this is empty."
 msgstr ""
 
 #: src/Form/ConfigForm.php
 msgid "The organisation responsible for the dataset."
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "The precise role (author, research team member, interviewer, sponsor, …), from the MARC relators."
 msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml
@@ -346,12 +503,24 @@ msgstr ""
 msgid "The query returned a graph, shown as Turtle."
 msgstr ""
 
+#: src/Dataset/DatasetSummary.php
+msgid "The record's immediate whole."
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "The records of a project"
+msgstr ""
+
 #: view/common/block-layout/dre-linked-data.phtml
 msgid "The results could not be downloaded."
 msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml
 msgid "The results were cut short, perhaps because the query took too long. Add a LIMIT, or download the results instead."
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "The same entity, or a matching concept, in another dataset."
 msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml
@@ -374,6 +543,10 @@ msgstr ""
 msgid "Try again"
 msgstr ""
 
+#: src/Dataset/DatasetSummary.php
+msgid "Type of resource, language, genre, target audience."
+msgstr ""
+
 #: src/Form/ConfigForm.php
 msgid "Used in the VoID/DCAT description and on the Linked open data page block. Defaults to the site title."
 msgstr ""
@@ -382,8 +555,64 @@ msgstr ""
 msgid "Vocabularies used (%s)"
 msgstr ""
 
+#: src/Dataset/DatasetSummary.php
+msgid "What the record is about."
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Where research items are held"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "Where the original is held now."
+msgstr ""
+
 #: view/common/block-layout/dre-linked-data.phtml
 msgid "Yes: the pattern matches."
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "entity or concept → Wikidata, GND, Library of Congress, ORCID, …"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "item → item set; item → media"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "project or research section → person"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "publication → list of persons"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "record or project → organisation"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "record → concept"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "record → concept, person, organisation or place"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "record → person or organisation"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "record → place"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "research item → organisation or place"
+msgstr ""
+
+#: src/Dataset/DatasetSummary.php
+msgid "research item → project; project → research section; publication → journal, book or series; place → country; person → institution"
 msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml

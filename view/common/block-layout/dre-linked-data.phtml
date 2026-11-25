@@ -183,6 +183,56 @@ $stats = [
         </section>
     </div>
 
+    <?php $model = $summary['model']; ?>
+    <section class="dre-ld__panel dre-ld__model" aria-labelledby="<?php echo $escapeAttr($blockId . '-model'); ?>">
+        <<?php echo $sub; ?> class="dre-ld__panel-title" id="<?php echo $escapeAttr($blockId . '-model'); ?>"><?php echo $escape($translate('How the data is modelled')); ?></<?php echo $sub; ?>>
+        <p class="dre-ld__text"><?php echo $escape($translate('Every record, whatever its kind, is a resource with a URI of the same form. Its class (rdf:type) says what kind of record it is, and in the N-Quads dump each kind also sits in a named graph of its own. A query without GRAPH reads all of them together.')); ?></p>
+        <div class="dre-ld__table-wrap">
+            <table class="dre-ld__table">
+                <caption><?php echo $escape($translate('Kinds of record')); ?></caption>
+                <thead>
+                    <tr>
+                        <th scope="col"><?php echo $escape($translate('Records')); ?></th>
+                        <th scope="col"><?php echo $escape($translate('Classes')); ?></th>
+                        <th scope="col"><?php echo $escape($translate('Named graph')); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($model['kinds'] as $kind): ?>
+                    <tr>
+                        <th scope="row"><?php echo $escape($translate($kind['label'])); ?></th>
+                        <td><code><?php echo $escape($kind['classes']); ?></code></td>
+                        <td><code><?php echo $escape($kind['graph']); ?></code></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <p class="dre-ld__text"><?php echo $escape($translate('A graph\'s full name is its short name in this pattern:')); ?> <code><?php echo $escape($model['graphPattern']); ?></code></p>
+        <div class="dre-ld__table-wrap">
+            <table class="dre-ld__table">
+                <caption><?php echo $escape($translate('How records link to each other')); ?></caption>
+                <thead>
+                    <tr>
+                        <th scope="col"><?php echo $escape($translate('Predicate')); ?></th>
+                        <th scope="col"><?php echo $escape($translate('From → to')); ?></th>
+                        <th scope="col"><?php echo $escape($translate('Meaning')); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($model['links'] as $link): ?>
+                    <tr>
+                        <th scope="row"><code><?php echo $escape($link['predicate']); ?></code></th>
+                        <td><?php echo $escape($translate($link['links'])); ?></td>
+                        <td><?php echo $escape($translate($link['meaning'])); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <p class="dre-ld__text"><?php echo $escape($translate('Every link points at another resource URI, never at a plain name. To find everything that points at a record, whatever the predicate, ask for ?record ?predicate followed by its URI.')); ?></p>
+    </section>
+
     <?php if (!empty($summary['sparql'])):
         $sparql = $summary['sparql'];
         // Strings for asset/js/dre-linked-data.js, which runs the form in place.
