@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **The page no longer scrolls sideways on a phone.** The SPARQL query picker and the
+  vocabulary list were single-column grids with an implicit `auto` track, which grew to its
+  widest child: the picker's longest option ("Projects by research section, with their
+  investigators") made the whole page about 500px wide on a 390px or 320px screen. Both now
+  pin their column to the block's width, as every other grid in the stylesheet does, and
+  `tests/StylesheetTest.php` fails on any grid that does not name its columns.
+
 ## [0.8.0] - 2026-11-25
 
 ### Added

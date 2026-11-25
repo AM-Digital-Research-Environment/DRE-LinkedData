@@ -36,3 +36,28 @@ test('the stale-dump notice is drawn from the theme\'s warning tokens', function
     assertContainsText('var(--warning-bg,', $rule[1]);
     assertContainsText('var(--warning,', $rule[1]);
 });
+
+/*
+ * A grid with no `grid-template-columns` gets an implicit `auto` track, which
+ * grows to its widest child's min-content: the query picker's longest option
+ * once pushed the whole page 100px past a 390px viewport that way. Every grid
+ * here names its columns, `minmax(0, 1fr)` for a single one.
+ */
+test('every grid in the stylesheet declares its columns', function (): void {
+    $css = (string) file_get_contents(dirname(__DIR__) . '/asset/css/dre-linked-data.css');
+    $css = (string) preg_replace('#/\*.*?\*/#s', '', $css);
+    // Innermost blocks only, so a rule inside a media query is read on its own.
+    preg_match_all('/([^{}]+)\{([^{}]*)\}/', $css, $rules, PREG_SET_ORDER);
+    $grids = 0;
+    foreach ($rules as [, $selector, $body]) {
+        if (preg_match('/(?<![a-z-])display\s*:\s*(inline-)?grid\b/', $body) !== 1) {
+            continue;
+        }
+        $grids++;
+        assertTrue(
+            preg_match('/(?<![a-z-])grid-template-columns\s*:/', $body) === 1,
+            trim($selector) . ' sets display: grid without grid-template-columns, so its implicit auto track can outgrow a narrow viewport'
+        );
+    }
+    assertTrue($grids > 0, 'the stylesheet has at least one grid');
+});

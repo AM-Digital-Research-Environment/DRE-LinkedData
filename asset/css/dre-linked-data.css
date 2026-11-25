@@ -271,8 +271,11 @@
     gap: var(--space-3, 0.75rem);
 }
 
+/* Without the pinned track, the select's longest option sets the column's
+   width and pushes the page sideways on a phone. */
 .dre-ld__field {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-1, 0.25rem);
     margin: 0;
 }
@@ -285,6 +288,7 @@
 .dre-ld__select {
     justify-self: start;
     width: auto;
+    min-width: 0;
     max-width: 100%;
     margin: 0;
 }
@@ -529,6 +533,7 @@
 
 .dre-ld__vocabulary-list {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2, 0.5rem);
     margin: var(--space-3, 0.75rem) 0 0;
     font-size: var(--text-sm, 0.9375rem);
