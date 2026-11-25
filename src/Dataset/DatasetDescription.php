@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace DRELinkedData\Dataset;
 
 use DRELinkedData\Dump\DumpState;
+use DRELinkedData\Dump\GraphMap;
 use DRELinkedData\Projection\IdentityLinks;
 use DRELinkedData\Projection\UriScheme;
 use DRELinkedData\Rdf\Format;
@@ -29,6 +30,11 @@ use DRELinkedData\Settings\DatasetSettings;
  * twice over: void:sparqlEndpoint for Linked Data tools, and a dcat:DataService
  * serving the dataset for catalogues.
  *
+ * The N-Quads dump is a second dcat:Distribution, and each of its named
+ * graphs a void:subset of the dataset whose node is the graph's own name, with
+ * its title and figures. void:dataDump names only the N-Triples file: VoID
+ * reads several dumps as parts of one dataset, and these two are copies.
+ *
  * The figures come from the last dump run's state, so they describe exactly
  * the file a client will download. Before the first run the description still
  * says what the dataset is and where its resources live, just without counts
@@ -43,6 +49,7 @@ final class DatasetDescription
         private readonly UriScheme $uris,
         private readonly IdentityLinks $identityLinks,
         private readonly array $keywords = [],
+        private readonly ?GraphMap $graphs = null,
     ) {
     }
 
@@ -180,6 +187,45 @@ final class DatasetDescription
         }
         if ($settings->licence !== null) {
             $add($distribution, Vocab::DCTERMS, 'license', new Iri($settings->licence));
+        }
+
+        if ($state->nquadsSha256 !== null) {
+            $nquads = $this->uris->nquadsDistribution();
+            $add($dataset, Vocab::DCAT, 'distribution', $nquads);
+            $add($nquads, Vocab::RDF, 'type', Vocab::iri(Vocab::DCAT, 'Distribution'));
+            $add($nquads, Vocab::DCTERMS, 'title', new Literal('N-Quads dump (gzip), one named graph per kind of record', 'en'));
+            $add($nquads, Vocab::DCAT, 'accessURL', new Iri($this->uris->dumpNquads()));
+            $add($nquads, Vocab::DCAT, 'downloadURL', new Iri($this->uris->dumpNquads()));
+            $add($nquads, Vocab::DCAT, 'mediaType', new Iri(Vocab::IANA_MEDIA . 'application/n-quads'));
+            $add($nquads, Vocab::DCAT, 'compressFormat', new Iri(Vocab::IANA_MEDIA . 'application/gzip'));
+            if ($state->nquadsBytes !== null) {
+                $add($nquads, Vocab::DCAT, 'byteSize', new Literal((string) $state->nquadsBytes, null, Vocab::XSD . 'nonNegativeInteger'));
+            }
+            $nquadsSha = strtolower($state->nquadsSha256);
+            if (preg_match('~^[0-9a-f]{64}$~', $nquadsSha)) {
+                $checksum = $this->uris->nquadsChecksum();
+                $add($nquads, Vocab::SPDX, 'checksum', $checksum);
+                $add($checksum, Vocab::RDF, 'type', Vocab::iri(Vocab::SPDX, 'Checksum'));
+                $add($checksum, Vocab::SPDX, 'algorithm', Vocab::iri(Vocab::SPDX, 'checksumAlgorithm_sha256'));
+                $add($checksum, Vocab::SPDX, 'checksumValue', new Literal($nquadsSha, null, Vocab::XSD . 'hexBinary'));
+            }
+            if ($modified !== null) {
+                $add($nquads, Vocab::DCTERMS, 'modified', $modified);
+            }
+            if ($settings->licence !== null) {
+                $add($nquads, Vocab::DCTERMS, 'license', new Iri($settings->licence));
+            }
+        }
+
+        // Each named graph is a subset; its node is the graph name itself.
+        $titles = $this->graphs?->titles() ?? [];
+        foreach ($state->graphs as $graph) {
+            $node = $this->uris->graph($graph['graph']);
+            $add($dataset, Vocab::VOID, 'subset', $node);
+            $add($node, Vocab::RDF, 'type', Vocab::iri(Vocab::VOID, 'Dataset'));
+            $add($node, Vocab::DCTERMS, 'title', new Literal($titles[$graph['graph']] ?? $graph['graph'], 'en'));
+            $add($node, Vocab::VOID, 'triples', $integer($graph['triples']));
+            $add($node, Vocab::VOID, 'entities', $integer($graph['entities']));
         }
 
         // A linkset's objectsTarget is a dataset, not a website: each authority

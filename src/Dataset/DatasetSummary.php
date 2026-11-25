@@ -5,6 +5,7 @@ namespace DRELinkedData\Dataset;
 
 use DRELinkedData\Dump\ChangeTracker;
 use DRELinkedData\Dump\DumpStore;
+use DRELinkedData\Dump\GraphMap;
 use DRELinkedData\Projection\IdentityLinks;
 use DRELinkedData\Projection\UriScheme;
 use DRELinkedData\Rdf\Format;
@@ -119,6 +120,7 @@ final class DatasetSummary
         private readonly \Closure $prefixes,
         private readonly ?\Closure $isVisible = null,
         private readonly ?ChangeTracker $changes = null,
+        private readonly ?GraphMap $graphs = null,
     ) {
     }
 
@@ -140,6 +142,16 @@ final class DatasetSummary
                 'encoding' => 'application/gzip',
                 'bytes' => $state->bytes,
             ];
+            // Appended, so distributions[0] stays the N-Triples dump (0.8.0+).
+            if ($state->nquadsSha256 !== null) {
+                $distributions[] = [
+                    'label' => 'N-Quads dump (gzip)',
+                    'url' => $this->uris->dumpNquads(),
+                    'type' => 'application/n-quads',
+                    'encoding' => 'application/gzip',
+                    'bytes' => $state->nquadsBytes,
+                ];
+            }
         }
         return [
             'uri' => $this->uris->dataset()->value,
@@ -218,6 +230,19 @@ final class DatasetSummary
             'bytes' => $state?->bytes,
             'sha256' => $state?->sha256,
             'dumpUrl' => $this->uris->dump(),
+            // The N-Quads twin, null for a dump written before it existed.
+            'nquads' => $state?->nquadsSha256 !== null ? [
+                'url' => $this->uris->dumpNquads(),
+                'bytes' => $state->nquadsBytes,
+                'sha256' => $state->nquadsSha256,
+                'graphs' => array_map(
+                    fn (array $graph): array => $graph + [
+                        'uri' => $this->uris->graph($graph['graph'])->value,
+                        'title' => $this->graphs?->titles()[$graph['graph']] ?? $graph['graph'],
+                    ],
+                    $state->graphs
+                ),
+            ] : null,
             'void' => Format::documents(fn (Format $format): string => $this->uris->voidDocument($format)),
             'voidUrl' => $this->uris->voidDocument(),
             'uriPattern' => $this->uris->resourceSpace() . '{id}',

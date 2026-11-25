@@ -16,11 +16,12 @@ namespace DRELinkedData\Dump;
 final class DumpState
 {
     /** Bumped when the file's shape changes. */
-    public const VERSION = 2;
+    public const VERSION = 3;
 
     /**
      * @param string[] $vocabularies namespaces of the predicates and classes used
      * @param list<array{authority:string,predicate:string,triples:int}> $linksets
+     * @param list<array{graph:string,triples:int,entities:int}> $graphs the N-Quads dump's named graphs, by key
      */
     public function __construct(
         /** When the run finished (ISO 8601, UTC): the dump's dcterms:modified. */
@@ -40,6 +41,10 @@ final class DumpState
         public readonly array $linksets = [],
         /** The richest item, the VoID's void:exampleResource. */
         public readonly ?int $exampleResource = null,
+        /** The N-Quads dump (dump.nq.gz), written by the same run; null before 0.8.0. */
+        public readonly ?int $nquadsBytes = null,
+        public readonly ?string $nquadsSha256 = null,
+        public readonly array $graphs = [],
     ) {
     }
 
@@ -61,6 +66,16 @@ final class DumpState
             }
         }
         $example = $int($data['example_resource'] ?? null);
+        $graphs = [];
+        foreach (is_array($data['graphs'] ?? null) ? $data['graphs'] : [] as $graph) {
+            if (is_array($graph) && is_string($graph['graph'] ?? null) && $graph['graph'] !== '') {
+                $graphs[] = [
+                    'graph' => $graph['graph'],
+                    'triples' => (int) ($int($graph['triples'] ?? null) ?? 0),
+                    'entities' => (int) ($int($graph['entities'] ?? null) ?? 0),
+                ];
+            }
+        }
 
         return new self(
             $string('generated_at'),
@@ -76,6 +91,9 @@ final class DumpState
             array_values(array_filter(is_array($data['vocabularies'] ?? null) ? $data['vocabularies'] : [], 'is_string')),
             $linksets,
             $example !== null && $example > 0 ? $example : null,
+            $int($data['nquads_bytes'] ?? null),
+            $string('nquads_sha256'),
+            $graphs,
         );
     }
 
@@ -95,6 +113,11 @@ final class DumpState
             'vocabularies' => $this->vocabularies,
             'linksets' => $this->linksets,
             'example_resource' => $this->exampleResource,
+            // Flat keys, so a shell loader (omeka-s-docker's sparql service)
+            // can read them with sed as it reads sha256.
+            'nquads_bytes' => $this->nquadsBytes,
+            'nquads_sha256' => $this->nquadsSha256,
+            'graphs' => $this->graphs,
         ];
     }
 

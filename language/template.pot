@@ -42,6 +42,10 @@ msgid "Dataset title"
 msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml
+msgid "Download N-Quads"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
 msgid "Download N-Triples"
 msgstr ""
 
@@ -55,6 +59,10 @@ msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml
 msgid "Download started."
+msgstr ""
+
+#: view/dre-linked-data/admin/status.phtml
+msgid "Download the N-Quads dump (named graphs)"
 msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml
@@ -348,6 +356,10 @@ msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml
 msgid "The same graph can be queried directly at a read-only SPARQL endpoint, loaded from the dump:"
+msgstr ""
+
+#: view/common/block-layout/dre-linked-data.phtml
+msgid "The same statements as N-Quads, with each kind of record (research items, publications, persons, places, …) in a named graph of its own:"
 msgstr ""
 
 #: view/common/block-layout/dre-linked-data.phtml

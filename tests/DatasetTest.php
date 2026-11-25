@@ -311,3 +311,88 @@ test('the summary says when the dump is out of date', function (): void {
         removeDirectory($dir);
     }
 });
+
+test('the VoID describes the N-Quads dump and each named graph as a subset', function (): void {
+    $state = sampleState() + [
+        'nquads_bytes' => 6000000,
+        'nquads_sha256' => str_repeat('cd', 32),
+        'graphs' => [
+            ['graph' => 'research-items', 'triples' => 100000, 'entities' => 3800],
+            ['graph' => 'persons', 'triples' => 20000, 'entities' => 2373],
+        ],
+    ];
+    $description = new DatasetDescription(
+        new UriScheme(FIXTURE_BASE),
+        new IdentityLinks(moduleConfig()['projection']['identity_links']),
+        [],
+        new DRELinkedData\Dump\GraphMap(moduleConfig()['dump']['graphs'])
+    );
+    $settings = new DatasetSettings('AMIRA', '', '', null, null);
+    $nt = (new NTriplesSerializer())->serialize($description->triples($settings, DumpState::fromArray($state), null, null));
+    $void = 'http://rdfs.org/ns/void#';
+    $dataset = '<' . FIXTURE_BASE . '/linked-data/void#dataset>';
+    $nquads = '<' . FIXTURE_BASE . '/linked-data/void#dump-nquads>';
+    assertContainsText($dataset . ' <http://www.w3.org/ns/dcat#distribution> ' . $nquads . ' .', $nt);
+    assertContainsText($nquads . ' <http://www.w3.org/ns/dcat#downloadURL> <' . FIXTURE_BASE . '/linked-data/dump.nq.gz> .', $nt);
+    assertContainsText($nquads . ' <http://www.w3.org/ns/dcat#mediaType> <http://www.iana.org/assignments/media-types/application/n-quads> .', $nt);
+    assertContainsText($nquads . ' <http://www.w3.org/ns/dcat#byteSize> "6000000"^^<http://www.w3.org/2001/XMLSchema#nonNegativeInteger> .', $nt);
+    assertContainsText('"' . str_repeat('cd', 32) . '"^^<http://www.w3.org/2001/XMLSchema#hexBinary>', $nt);
+    assertNotContainsText($void . 'dataDump> <' . FIXTURE_BASE . '/linked-data/dump.nq.gz>', $nt, 'the copy is not a second part of the dataset');
+
+    $graph = '<' . FIXTURE_BASE . '/linked-data/void#graph-research-items>';
+    assertContainsText($dataset . ' <' . $void . 'subset> ' . $graph . ' .', $nt);
+    assertContainsText($graph . ' <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <' . $void . 'Dataset> .', $nt);
+    assertContainsText($graph . ' <http://purl.org/dc/terms/title> "Research items"@en .', $nt);
+    assertContainsText($graph . ' <' . $void . 'triples> "100000"^^<http://www.w3.org/2001/XMLSchema#integer> .', $nt);
+    assertContainsText($graph . ' <' . $void . 'entities> "3800"^^<http://www.w3.org/2001/XMLSchema#integer> .', $nt);
+    assertContainsText('<' . FIXTURE_BASE . '/linked-data/void#graph-persons> <http://purl.org/dc/terms/title> "Persons"@en .', $nt);
+
+    $old = (new NTriplesSerializer())->serialize($description->triples($settings, DumpState::fromArray(sampleState()), null, null));
+    assertNotContainsText('dump-nquads', $old, 'a dump made before the N-Quads file advertises none');
+    assertNotContainsText('#graph-', $old);
+});
+
+test('the summary and the helper offer the N-Quads dump after the N-Triples one', function (): void {
+    $dir = tempDirectory('summary-nquads');
+    try {
+        $store = new DumpStore($dir);
+        $summary = new DatasetSummary(
+            $store,
+            new UriScheme(FIXTURE_BASE),
+            new IdentityLinks(moduleConfig()['projection']['identity_links']),
+            static fn (): PrefixMap => new PrefixMap(),
+            null,
+            null,
+            new DRELinkedData\Dump\GraphMap(moduleConfig()['dump']['graphs'])
+        );
+        $settings = new DatasetSettings('AMIRA', '', '', null, null);
+        file_put_contents($dir . '/dump.nt.gz', gzencode("<a:b> <a:c> <a:d> .\n"));
+        file_put_contents($dir . '/state.json', json_encode(sampleState()));
+        assertSameValue(null, $summary->build($settings)['nquads'], 'an older dump has no N-Quads twin');
+        assertSameValue(1, count($summary->dataset($settings)['distributions']));
+
+        file_put_contents($dir . '/state.json', json_encode(sampleState() + [
+            'nquads_bytes' => 6000000,
+            'nquads_sha256' => str_repeat('cd', 32),
+            'graphs' => [['graph' => 'places', 'triples' => 3000, 'entities' => 282]],
+        ]));
+        $nquads = $summary->build($settings)['nquads'];
+        assertSameValue(FIXTURE_BASE . '/linked-data/dump.nq.gz', $nquads['url']);
+        assertSameValue(6000000, $nquads['bytes']);
+        assertSameValue([[
+            'graph' => 'places', 'triples' => 3000, 'entities' => 282,
+            'uri' => FIXTURE_BASE . '/linked-data/void#graph-places', 'title' => 'Places',
+        ]], $nquads['graphs']);
+        $distributions = $summary->dataset($settings)['distributions'];
+        assertSameValue('N-Triples dump (gzip)', $distributions[0]['label'], 'the first entry is unchanged');
+        assertSameValue([
+            'label' => 'N-Quads dump (gzip)',
+            'url' => FIXTURE_BASE . '/linked-data/dump.nq.gz',
+            'type' => 'application/n-quads',
+            'encoding' => 'application/gzip',
+            'bytes' => 6000000,
+        ], $distributions[1]);
+    } finally {
+        removeDirectory($dir);
+    }
+});

@@ -6,6 +6,7 @@ namespace DRELinkedData\Dump;
 use DRELinkedData\Projection\OmekaSource;
 use DRELinkedData\Projection\ResourceDescription;
 use DRELinkedData\Projection\ResourceProjector;
+use DRELinkedData\Projection\UriScheme;
 use DRELinkedData\Rdf\Iri;
 use DRELinkedData\Rdf\PrefixMap;
 use DRELinkedData\Rdf\Serializer\NTriplesSerializer;
@@ -13,7 +14,8 @@ use DRELinkedData\Rdf\Vocab;
 use Laminas\Log\LoggerInterface;
 
 /**
- * Writes the full public graph as gzipped N-Triples.
+ * Writes the full public graph as gzipped N-Triples, and the same statements
+ * as gzipped N-Quads with one named graph per kind of record ({@see GraphMap}).
  *
  * Resources are read in id-ordered batches (keyset paging, so memory stays
  * flat however large the instance grows) and streamed into the gzip file as
@@ -21,7 +23,9 @@ use Laminas\Log\LoggerInterface;
  * resources over HTTP, so the dump and `/resource/{id}.nt` cannot disagree.
  *
  * N-Triples is the format Apache Jena's loaders and Fuseki's upload take most
- * directly, and the only one that can be produced one line at a time.
+ * directly, and the only one that can be produced one line at a time; N-Quads
+ * is its line-based twin for datasets. Both files are written in one pass, so
+ * they hold the same statements: the N-Quads file only adds the graph names.
  */
 final class DumpGenerator
 {
@@ -33,6 +37,8 @@ final class DumpGenerator
         private readonly LoggerInterface $logger,
         private readonly int $batchSize = 250,
         private readonly ?ChangeTracker $changes = null,
+        private readonly ?GraphMap $graphs = null,
+        private readonly ?UriScheme $uris = null,
     ) {
     }
 
@@ -59,6 +65,20 @@ final class DumpGenerator
             throw new \RuntimeException('Unable to open ' . $partPath . ' for writing.');
         }
         $open = true;
+        // The N-Quads twin needs graph names, hence both the map and the URIs.
+        $quads = $this->graphs !== null && $this->uris !== null;
+        $nquadsPath = $quads ? $this->store->partPath() : null;
+        $nquads = $nquadsPath !== null ? gzopen($nquadsPath, 'wb6') : null;
+        if ($nquads === false) {
+            gzclose($gzip);
+            $this->store->discard($partPath);
+            $this->store->unlock($lock);
+            throw new \RuntimeException('Unable to open ' . $nquadsPath . ' for writing.');
+        }
+        /** @var array<string,Iri> $graphIris */
+        $graphIris = [];
+        /** @var array<string,array{triples:int,entities:int}> $graphCounts */
+        $graphCounts = [];
 
         $serializer = new NTriplesSerializer();
         $triples = 0;
@@ -82,8 +102,20 @@ final class DumpGenerator
 
                 foreach ($this->projector->describe($ids) as $description) {
                     $chunk = '';
+                    $quadChunk = '';
+                    $graph = null;
+                    if ($quads) {
+                        $key = $this->graphs->graphFor($description);
+                        $graph = $graphIris[$key] ??= $this->uris->graph($key);
+                        $graphCounts[$key] ??= ['triples' => 0, 'entities' => 0];
+                        $graphCounts[$key]['triples'] += count($description->triples);
+                        $graphCounts[$key]['entities']++;
+                    }
                     foreach ($description->triples as $triple) {
                         $chunk .= $serializer->line($triple);
+                        if ($graph !== null) {
+                            $quadChunk .= $serializer->quad($triple, $graph);
+                        }
                         $terms = [$triple->predicate->value];
                         if ($triple->predicate->value === Vocab::RDF_TYPE && $triple->object instanceof Iri) {
                             $terms[] = $triple->object->value;
@@ -97,6 +129,9 @@ final class DumpGenerator
                     }
                     if ($chunk !== '' && gzwrite($gzip, $chunk) === false) {
                         throw new \RuntimeException('Writing to ' . $partPath . ' failed.');
+                    }
+                    if ($nquads !== null && $quadChunk !== '' && gzwrite($nquads, $quadChunk) === false) {
+                        throw new \RuntimeException('Writing to ' . $nquadsPath . ' failed.');
                     }
 
                     $triples += count($description->triples);
@@ -114,7 +149,17 @@ final class DumpGenerator
             }
 
             gzclose($gzip);
+            if ($nquads !== null) {
+                gzclose($nquads);
+            }
             $open = false;
+            // In the configured order, so the VoID lists them as the config does.
+            $graphList = [];
+            foreach ($quads ? array_keys($this->graphs->titles()) : [] as $key) {
+                if (isset($graphCounts[$key])) {
+                    $graphList[] = ['graph' => $key] + $graphCounts[$key];
+                }
+            }
 
             ksort($vocabularies);
             ksort($linksets);
@@ -142,8 +187,11 @@ final class DumpGenerator
                     array_values($linksets)
                 ),
                 exampleResource: $example,
+                nquadsBytes: $nquadsPath !== null ? (int) filesize($nquadsPath) : null,
+                nquadsSha256: $nquadsPath !== null ? (string) hash_file('sha256', $nquadsPath) : null,
+                graphs: $graphList,
             );
-            $this->store->publish($partPath, $state);
+            $this->store->publish($partPath, $state, $nquadsPath);
             $this->changes?->settle($startedAt);
 
             $this->logger->info(sprintf(
@@ -156,8 +204,14 @@ final class DumpGenerator
         } finally {
             if ($open) {
                 gzclose($gzip);
+                if ($nquads !== null) {
+                    gzclose($nquads);
+                }
             }
             $this->store->discard($partPath);
+            if ($nquadsPath !== null) {
+                $this->store->discard($nquadsPath);
+            }
             $this->store->unlock($lock);
         }
     }

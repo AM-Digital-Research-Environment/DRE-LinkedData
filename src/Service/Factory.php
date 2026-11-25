@@ -11,6 +11,7 @@ use DRELinkedData\Dataset\LandingPage;
 use DRELinkedData\Dump\ChangeTracker;
 use DRELinkedData\Dump\DumpGenerator;
 use DRELinkedData\Dump\DumpStore;
+use DRELinkedData\Dump\GraphMap;
 use DRELinkedData\Projection\IdentityLinks;
 use DRELinkedData\Projection\OmekaSource;
 use DRELinkedData\Projection\ResourceProjector;
@@ -61,8 +62,11 @@ final class Factory implements FactoryInterface
                 $container->get(RdfWriter::class)->prefixes(),
                 $container->get('Omeka\Logger'),
                 max(1, (int) ($config['dump']['batch_size'] ?? 250)),
-                $container->get(ChangeTracker::class)
+                $container->get(ChangeTracker::class),
+                $container->get(GraphMap::class),
+                $container->get(UriScheme::class)
             ),
+            GraphMap::class => new GraphMap((array) ($config['dump']['graphs'] ?? [])),
             ChangeTracker::class => new ChangeTracker(
                 $container->get('Omeka\Settings'),
                 $container->get(DumpStore::class)
@@ -74,7 +78,8 @@ final class Factory implements FactoryInterface
             DatasetDescription::class => new DatasetDescription(
                 $container->get(UriScheme::class),
                 $container->get(IdentityLinks::class),
-                array_values(array_filter((array) ($config['dataset']['keywords'] ?? []), 'is_string'))
+                array_values(array_filter((array) ($config['dataset']['keywords'] ?? []), 'is_string')),
+                $container->get(GraphMap::class)
             ),
             DatasetSummary::class => new DatasetSummary(
                 $container->get(DumpStore::class),
@@ -82,7 +87,8 @@ final class Factory implements FactoryInterface
                 $container->get(IdentityLinks::class),
                 static fn (): PrefixMap => $container->get(RdfWriter::class)->prefixes(),
                 static fn (int $id): bool => $container->get(OmekaSource::class)->isVisible($id),
-                $container->get(ChangeTracker::class)
+                $container->get(ChangeTracker::class),
+                $container->get(GraphMap::class)
             ),
             // The editorial settings, named after the default site when no
             // dataset title is set. Shared: built once per request.

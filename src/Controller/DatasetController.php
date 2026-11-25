@@ -5,6 +5,7 @@ namespace DRELinkedData\Controller;
 
 use DRELinkedData\Dataset\DatasetDescription;
 use DRELinkedData\Dataset\LandingPage;
+use DRELinkedData\Dump\DumpState;
 use DRELinkedData\Dump\DumpStore;
 use DRELinkedData\Projection\UriScheme;
 use DRELinkedData\Rdf\ContentNegotiator;
@@ -21,6 +22,7 @@ use Laminas\Http\Response\Stream;
  *   GET /linked-data/void[.ttl|.nt|.jsonld|.rdf]   VoID + DCAT description
  *   GET /.well-known/void                          303 → /linked-data/void (RFC 8615 / VoID §6.2)
  *   GET /linked-data/dump.nt.gz                    the full dump, gzipped N-Triples
+ *   GET /linked-data/dump.nq.gz                    the same as N-Quads, one named graph per kind
  *
  * The description's human form is the site page carrying the "Linked open
  * data" block: a browser asking /linked-data/void for HTML is sent there.
@@ -100,8 +102,22 @@ class DatasetController extends AbstractRdfController
 
     public function dumpAction(): Response
     {
-        $path = $this->store->dumpPath();
         $state = $this->store->state();
+        return $this->streamDump($this->store->dumpPath(), $state, $state?->bytes, $state?->sha256, '.nt.gz');
+    }
+
+    public function dumpNquadsAction(): Response
+    {
+        $state = $this->store->state();
+        // A dump written before the N-Quads file existed has no checksum for it.
+        if ($state === null || $state->nquadsSha256 === null) {
+            return $this->notFound();
+        }
+        return $this->streamDump($this->store->nquadsPath(), $state, $state->nquadsBytes, $state->nquadsSha256, '.nq.gz');
+    }
+
+    private function streamDump(string $path, ?DumpState $state, ?int $bytes, ?string $sha256, string $extension): Response
+    {
         $handle = $state !== null ? @fopen($path, 'rb') : false;
         if ($handle === false) {
             return $this->notFound();
@@ -113,8 +129,8 @@ class DatasetController extends AbstractRdfController
         $stat = fstat($handle) ?: [];
         $size = (int) ($stat['size'] ?? 0);
         $mtime = (int) ($stat['mtime'] ?? 0);
-        $sha256 = (string) $state->sha256;
-        $etag = $sha256 !== '' && $state->bytes === $size
+        $sha256 = (string) $sha256;
+        $etag = $sha256 !== '' && $bytes === $size
             ? '"' . substr($sha256, 0, 32) . '"'
             : 'W/"' . dechex($size) . '-' . dechex($mtime) . '"';
 
@@ -135,7 +151,7 @@ class DatasetController extends AbstractRdfController
             return $response;
         }
 
-        $filename = ($this->site->slug() ?? 'omeka') . '-linked-data.nt.gz';
+        $filename = ($this->site->slug() ?? 'omeka') . '-linked-data' . $extension;
         $headers->addHeaderLine('Content-Disposition', 'attachment; filename="' . $filename . '"');
         $headers->addHeaderLine('Content-Length', (string) $size);
         $response->setStatusCode(200);

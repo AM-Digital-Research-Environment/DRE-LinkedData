@@ -49,6 +49,9 @@ $number = static fn (int $value): string => $numberFormatter ? (string) $numberF
         <?php if ($summary['available']): ?>
         <li><a href="<?php echo $escapeAttr($summary['dumpUrl']); ?>"><?php echo $escape($translate('Download the dump')); ?></a></li>
         <?php endif; ?>
+        <?php if (!empty($summary['nquads'])): ?>
+        <li><a href="<?php echo $escapeAttr($summary['nquads']['url']); ?>"><?php echo $escape($translate('Download the N-Quads dump (named graphs)')); ?></a></li>
+        <?php endif; ?>
         <?php if ($summary['example']): ?>
         <li><a href="<?php echo $escapeAttr($summary['example']['documents'][0]['url']); ?>" target="_blank" rel="noopener"><?php echo $escape(sprintf($translate('Example resource #%d (Turtle)'), $summary['example']['id'])); ?></a></li>
         <?php endif; ?>

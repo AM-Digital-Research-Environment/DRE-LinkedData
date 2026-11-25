@@ -11,12 +11,14 @@ namespace DRELinkedData\Dump;
  * needs a dedicated volume for exactly that reason). Layout:
  *
  *   files/dre-linked-data/dump.nt.gz        the published dump
+ *   files/dre-linked-data/dump.nq.gz        the same graph as N-Quads, one named graph per kind
  *   files/dre-linked-data/state.json        what the last successful run produced
  *   files/dre-linked-data/.dump-*.part      a dump being written
  *   files/dre-linked-data/.lock             held while a run is in progress
  *
- * A run writes to a part file, writes the new state to a part file too, then
- * renames the dump and the state into place one right after the other, so a
+ * A run writes to part files, writes the new state to a part file too, then
+ * renames the N-Quads dump, the N-Triples dump and the state into place one
+ * right after the other, so a
  * reader sees either the previous dump or the new one, never half of one. In
  * the instant between the two renames the state may describe the other file;
  * the dump route checks the size before trusting the state's checksum as its
@@ -28,6 +30,7 @@ final class DumpStore
 {
     public const DIRECTORY = 'dre-linked-data';
     private const DUMP = 'dump.nt.gz';
+    private const NQUADS = 'dump.nq.gz';
     private const STATE = 'state.json';
     private const LOCK = '.lock';
 
@@ -46,6 +49,11 @@ final class DumpStore
     public function dumpPath(): string
     {
         return $this->directory . '/' . self::DUMP;
+    }
+
+    public function nquadsPath(): string
+    {
+        return $this->directory . '/' . self::NQUADS;
     }
 
     public function hasDump(): bool
@@ -102,10 +110,11 @@ final class DumpStore
     }
 
     /**
-     * Move a finished part file into place and record its state.
-     *
+     * Move finished part files into place and record their state. The N-Quads
+     * dump moves first: the N-Triples dump and state.json, which loaders poll,
+     * then never describe an older N-Quads file than their own.
      */
-    public function publish(string $partPath, DumpState $state): void
+    public function publish(string $partPath, DumpState $state, ?string $nquadsPartPath = null): void
     {
         // Everything that can fail slowly happens before the dump moves.
         $statePart = $this->directory . '/.state-' . bin2hex(random_bytes(6)) . '.part';
@@ -116,6 +125,10 @@ final class DumpStore
         if (@file_put_contents($statePart, $json . "\n", LOCK_EX) === false) {
             @unlink($statePart);
             throw new \RuntimeException('Unable to write the dump state in ' . $this->directory);
+        }
+        if ($nquadsPartPath !== null && !@rename($nquadsPartPath, $this->nquadsPath())) {
+            @unlink($statePart);
+            throw new \RuntimeException('Unable to move the new N-Quads dump into place at ' . $this->nquadsPath());
         }
         if (!@rename($partPath, $this->dumpPath())) {
             @unlink($statePart);

@@ -138,6 +138,19 @@ $stats = [
                 <code class="dre-ld__hash"><?php echo $escape($summary['sha256']); ?></code>
             </p>
             <?php endif; ?>
+            <?php if ($summary['nquads']): ?>
+            <p class="dre-ld__text"><?php echo $escape($translate('The same statements as N-Quads, with each kind of record (research items, publications, persons, places, …) in a named graph of its own:')); ?></p>
+            <p class="dre-ld__actions">
+                <a class="btn--secondary dre-ld__button" href="<?php echo $escapeAttr($summary['nquads']['url']); ?>" download>
+                    <?php echo $escape($translate('Download N-Quads')); ?>
+                    <span class="dre-ld__button-meta"><?php echo $escape('.nq.gz · ' . $bytes((int) $summary['nquads']['bytes'])); ?></span>
+                </a>
+            </p>
+            <p class="dre-ld__checksum">
+                <span class="dre-ld__checksum-label"><?php echo $escape($translate('SHA-256')); ?></span>
+                <code class="dre-ld__hash"><?php echo $escape($summary['nquads']['sha256']); ?></code>
+            </p>
+            <?php endif; ?>
             <?php else: ?>
             <p class="dre-ld__text"><?php echo $escape($translate('The dump will appear here once it has been generated.')); ?></p>
             <?php endif; ?>

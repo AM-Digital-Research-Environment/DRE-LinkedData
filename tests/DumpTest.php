@@ -5,6 +5,7 @@ use DRELinkedData\Dump\ChangeTracker;
 use DRELinkedData\Dump\DumpGenerator;
 use DRELinkedData\Dump\DumpState;
 use DRELinkedData\Dump\DumpStore;
+use DRELinkedData\Dump\GraphMap;
 use DRELinkedData\Rdf\PrefixMap;
 use DRELinkedData\Rdf\Serializer\NTriplesSerializer;
 use DRELinkedData\Settings\DatasetSettings;
@@ -20,7 +21,9 @@ function dumpGenerator(DumpStore $store, MemoryLogger $logger, int $batchSize = 
         PrefixMap::withVocabularies($source->vocabularyRows),
         $logger,
         $batchSize,
-        $changes
+        $changes,
+        new GraphMap(moduleConfig()['dump']['graphs']),
+        fixtureUris()
     );
 }
 
@@ -218,4 +221,57 @@ test('a dump run settles the changes it contains', function (): void {
     } finally {
         removeDirectory($dir);
     }
+});
+
+test('the N-Quads dump holds the same statements, one named graph per kind of record', function (): void {
+    $dir = tempDirectory('dump-nquads');
+    try {
+        $store = new DumpStore($dir);
+        $state = dumpGenerator($store, new MemoryLogger())->generate();
+        assertTrue($state !== null, 'generation should succeed');
+        assertTrue(is_file($store->nquadsPath()), 'the N-Quads dump is published beside the N-Triples one');
+        assertSameValue(filesize($store->nquadsPath()), $state->nquadsBytes);
+        assertSameValue(hash_file('sha256', $store->nquadsPath()), $state->nquadsSha256);
+
+        $triples = explode("\n", trim((string) gzdecode((string) file_get_contents($store->dumpPath()))));
+        $quads = explode("\n", trim((string) gzdecode((string) file_get_contents($store->nquadsPath()))));
+        assertSameValue(count($triples), count($quads), 'one quad per triple');
+        $graphOf = [];
+        foreach ($quads as $i => $quad) {
+            assertTrue((bool) preg_match('~^(.*) <(' . preg_quote(FIXTURE_BASE, '~') . '/linked-data/void#graph-[a-z-]+)> \.$~', $quad, $m), "quad {$i} names a graph: {$quad}");
+            assertSameValue($triples[$i], $m[1] . ' .', 'the quad is the triple plus its graph');
+            if (preg_match('~^<' . preg_quote(FIXTURE_BASE, '~') . '/resource/(\d+)> ~', $quad, $s)) {
+                $graphOf[(int) $s[1]][$m[2]] = true;
+            }
+        }
+        $graph = static fn (string $key): string => FIXTURE_BASE . '/linked-data/void#graph-' . $key;
+        foreach ($graphOf as $id => $graphs) {
+            assertSameValue(1, count($graphs), "resource {$id} sits in exactly one graph");
+        }
+        assertSameValue([$graph('persons')], array_keys($graphOf[149]));
+        assertSameValue([$graph('concepts')], array_keys($graphOf[2390]));
+        assertSameValue([$graph('research-items')], array_keys($graphOf[7392]));
+        assertSameValue([$graph('item-sets')], array_keys($graphOf[6259]));
+        assertSameValue([$graph('media')], array_keys($graphOf[8001]));
+        assertSameValue([$graph('other')], array_keys($graphOf[7401]), 'a template no graph names goes to the default graph');
+
+        $counts = array_column($state->graphs, null, 'graph');
+        assertSameValue(['research-items', 'persons', 'concepts', 'item-sets', 'media', 'other'], array_keys($counts), 'in configured order, empty graphs left out');
+        assertSameValue(['graph' => 'persons', 'triples' => count(array_filter($quads, static fn (string $q): bool => str_ends_with($q, '#graph-persons> .'))), 'entities' => 1], $counts['persons']);
+        assertSameValue($state->triples, array_sum(array_column($state->graphs, 'triples')));
+        assertSameValue($state->entities(), array_sum(array_column($state->graphs, 'entities')));
+        assertSameValue([], glob($dir . '/.*.part') ?: [], 'no part files are left behind');
+    } finally {
+        removeDirectory($dir);
+    }
+});
+
+test('publications go to their graph by item set, whatever their template', function (): void {
+    $map = new GraphMap(moduleConfig()['dump']['graphs']);
+    $item = static fn (?int $template, array $sets): DRELinkedData\Projection\ResourceDescription => new DRELinkedData\Projection\ResourceDescription(1, 'item', null, [], [], $template, $sets);
+    assertSameValue('publications', $map->graphFor($item(31, [29918])));
+    assertSameValue('publications', $map->graphFor($item(null, [5, 29918])));
+    assertSameValue('research-items', $map->graphFor($item(10, [29918])), 'the template wins over the item set');
+    assertSameValue('other', $map->graphFor($item(99, [5])));
+    assertSameValue('Subjects and other concepts', $map->titles()['concepts']);
 });

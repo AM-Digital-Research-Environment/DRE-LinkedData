@@ -17,6 +17,8 @@ use DRELinkedData\Rdf\Iri;
  *   {base}/linked-data/void#dataset   the dataset itself
  *   {base}/linked-data/void#sparql    the SPARQL endpoint, as a DCAT data service
  *   {base}/linked-data/dump.nt.gz  the full N-Triples dump
+ *   {base}/linked-data/dump.nq.gz  the same, as N-Quads in one named graph per kind
+ *   {base}/linked-data/void#graph-{key}   one of those graphs, a subset of the dataset
  *
  * Resource ids are Omeka's: the sync never deletes or renumbers items, so they
  * are stable, and the site slug is kept out of the identifier on purpose — a
@@ -139,6 +141,31 @@ final class UriScheme
     public function dump(): string
     {
         return $this->base . '/linked-data/dump.nt.gz';
+    }
+
+    public function dumpNquads(): string
+    {
+        return $this->base . '/linked-data/dump.nq.gz';
+    }
+
+    /** The N-Quads dump as a dcat:Distribution. */
+    public function nquadsDistribution(): Iri
+    {
+        return new Iri($this->voidDocument() . '#dump-nquads');
+    }
+
+    public function nquadsChecksum(): Iri
+    {
+        return new Iri($this->voidDocument() . '#dump-nquads-sha256');
+    }
+
+    /**
+     * A named graph of the N-Quads dump, which is also the VoID subset that
+     * describes it: its name dereferences to its description.
+     */
+    public function graph(string $key): Iri
+    {
+        return new Iri($this->voidDocument() . '#graph-' . rawurlencode($key));
     }
 
     public function originalFile(string $storageId, ?string $extension): Iri

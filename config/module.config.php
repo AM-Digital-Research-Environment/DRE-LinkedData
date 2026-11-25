@@ -25,6 +25,7 @@ return [
             Rdf\RdfWriter::class => Service\Factory::class,
             Dump\DumpStore::class => Service\Factory::class,
             Dump\DumpGenerator::class => Service\Factory::class,
+            Dump\GraphMap::class => Service\Factory::class,
             Dataset\DatasetDescription::class => Service\Factory::class,
             Dataset\DatasetSummary::class => Service\Factory::class,
             Dataset\LandingPage::class => Service\Factory::class,
@@ -112,6 +113,17 @@ return [
                     'defaults' => [
                         'controller' => Controller\DatasetController::class,
                         'action' => 'dump',
+                    ],
+                ],
+            ],
+            // The same statements as N-Quads, one named graph per kind of record.
+            'dre-linked-data-dump-nquads' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route' => '/linked-data/dump.nq.gz',
+                    'defaults' => [
+                        'controller' => Controller\DatasetController::class,
+                        'action' => 'dumpNquads',
                     ],
                 ],
             ],
@@ -278,6 +290,36 @@ return [
         'dump' => [
             // Resources projected per batch; each batch is a handful of queries.
             'batch_size' => 250,
+
+            // The named graphs of the N-Quads dump, one per kind of record
+            // (Dump\GraphMap). Media and item sets go by their kind; an item
+            // goes to the first graph naming its template, else the first
+            // naming one of its item sets, else to `default`. Template and
+            // item set ids are AMIRA's (MongoDB2OmekaS config/profiles/amira.json):
+            // publications are matched by their item set, 29918, because their
+            // templates (11-20, 24-32 today) grow with each new EPrints type.
+            // The keys are part of each graph's name
+            // ({base}/linked-data/void#graph-{key}): never rename one.
+            'graphs' => [
+                'default' => 'other',
+                'list' => [
+                    'research-items' => ['title' => 'Research items', 'templates' => [10]],
+                    'publications' => ['title' => 'Publications', 'item_sets' => [29918]],
+                    'persons' => ['title' => 'Persons', 'templates' => [4]],
+                    'organisations' => ['title' => 'Organisations', 'templates' => [2]],
+                    'research-sections' => ['title' => 'Research sections', 'templates' => [7]],
+                    'projects' => ['title' => 'Projects', 'templates' => [5]],
+                    'concepts' => ['title' => 'Subjects and other concepts', 'templates' => [6]],
+                    'places' => ['title' => 'Places', 'templates' => [3]],
+                    'venues' => ['title' => 'Journals and series', 'templates' => [23, 33]],
+                    'podcasts' => ['title' => 'Podcasts', 'templates' => [21]],
+                    'videos' => ['title' => 'Videos', 'templates' => [22]],
+                    'chronicles' => ['title' => 'Cluster Chronicles', 'templates' => [34]],
+                    'item-sets' => ['title' => 'Item sets', 'kind' => 'item_set'],
+                    'media' => ['title' => 'Media', 'kind' => 'media'],
+                    'other' => ['title' => 'Other records'],
+                ],
+            ],
         ],
         'dataset' => [
             // dcat:keyword on the dataset, tagged @en.

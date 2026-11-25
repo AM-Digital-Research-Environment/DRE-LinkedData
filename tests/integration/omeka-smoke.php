@@ -376,6 +376,7 @@ try {
             '/linked-data/void' => ['dre-linked-data-void', null],
             '/linked-data/void.nt' => ['dre-linked-data-void', 'nt'],
             '/linked-data/dump.nt.gz' => ['dre-linked-data-dump', null],
+            '/linked-data/dump.nq.gz' => ['dre-linked-data-dump-nquads', null],
             '/.well-known/void' => ['dre-linked-data-well-known', null],
         ] as $path => [$name, $format]
     ) {
@@ -466,6 +467,7 @@ try {
     // ── Dump, then the dataset endpoints that describe it ─────────────────
     $noDump = $dispatch(DatasetController::class, '/linked-data/dump.nt.gz');
     smokeAssert($noDump->getStatusCode() === 404, 'No dump yet must be a 404.');
+    smokeAssert($dispatch(DatasetController::class, '/linked-data/dump.nq.gz')->getStatusCode() === 404, 'No N-Quads dump yet must be a 404.');
 
     $state = $services->get(DumpGenerator::class)->generate();
     smokeAssert($state !== null && $state->resources() === ['items' => 4, 'item_sets' => 2, 'media' => 1], 'Dump counts: ' . json_encode($state?->resources()));
@@ -475,6 +477,26 @@ try {
     foreach (['Secret title', 'Private working title', 'mongoId', 'resource/2>', 'resource/5>', 'internal-name'] as $leak) {
         smokeAssert(!str_contains(implode("\n", $dumpGraph), $leak), "Leaked into the dump: {$leak}");
     }
+
+    // The N-Quads twin: the same statements, each resource in one named graph.
+    $nquadsPath = $services->get(DumpStore::class)->nquadsPath();
+    $quadLines = array_values(array_filter(explode("
+", (string) gzdecode((string) file_get_contents($nquadsPath)))));
+    smokeAssert(count($quadLines) === $state->triples && $state->nquadsSha256 === hash_file('sha256', $nquadsPath), 'The N-Quads dump and its state disagree.');
+    $asTriples = [];
+    foreach ($quadLines as $quad) {
+        smokeAssert((bool) preg_match('~^(.*) <' . preg_quote($base, '~') . '/linked-data/void#graph-[a-z-]+> \.$~', $quad, $m), "A quad names no graph: {$quad}");
+        $asTriples[] = $m[1] . ' .';
+    }
+    smokeAssert(canonicalGraph(implode("
+", $asTriples) . "
+", 'ntriples') === $dumpGraph, 'Without graph names, the N-Quads dump must be the N-Triples dump.');
+    smokeAssert(array_sum(array_column($state->graphs, 'triples')) === $state->triples, 'The graphs must account for every triple.');
+    $nquadsDump = $dispatch(DatasetController::class, '/linked-data/dump.nq.gz');
+    smokeAssert($nquadsDump instanceof Response\Stream && $nquadsDump->getStatusCode() === 200, 'The N-Quads dump must stream.');
+    smokeAssert(str_contains($header($nquadsDump, 'Content-Disposition'), 'amira-linked-data.nq.gz'), 'Wrong N-Quads dump filename.');
+    smokeAssert($header($nquadsDump, 'ETag') === '"' . substr((string) $state->nquadsSha256, 0, 32) . '"', 'The N-Quads ETag is its own checksum.');
+    fclose($nquadsDump->getStream());
 
     $dump = $dispatch(DatasetController::class, '/linked-data/dump.nt.gz');
     smokeAssert($dump instanceof Response\Stream && $dump->getStatusCode() === 200, 'The dump must stream.');

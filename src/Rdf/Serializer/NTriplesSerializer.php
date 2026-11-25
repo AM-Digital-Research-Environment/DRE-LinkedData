@@ -31,6 +31,18 @@ final class NTriplesSerializer
             . self::term($triple->object) . " .\n";
     }
 
+    /**
+     * The statement as an N-Quads line (RDF 1.1 N-Quads) in the named graph
+     * $graph: the N-Triples line with the graph name before its final dot.
+     */
+    public function quad(Triple $triple, Iri $graph): string
+    {
+        return self::iri($triple->subject) . ' '
+            . self::iri($triple->predicate) . ' '
+            . self::term($triple->object) . ' '
+            . self::iri($graph) . " .\n";
+    }
+
     public static function iri(Iri $iri): string
     {
         return '<' . $iri->value . '>';
