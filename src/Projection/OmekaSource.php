@@ -97,7 +97,9 @@ class OmekaSource
 
     /**
      * Public values of $ids, in Omeka's order, each flagged with whether its
-     * linked resource (if any) is visible.
+     * linked resource (if any) is visible, with that resource's class. The
+     * class is read only when target_visible is 1 (a role link is
+     * generalised towards a visible agent only), and is never published.
      *
      * @param int[] $ids
      * @return array<int,array<string,mixed>>
@@ -109,7 +111,8 @@ class OmekaSource
         }
         return $this->connection->fetchAllAssociative(
             'SELECT v.resource_id, v.property_id, v.type, v.lang, v.value, v.uri, v.value_resource_id,
-                    CASE WHEN t.id IS NOT NULL AND ' . self::visible('t') . ' THEN 1 ELSE 0 END AS target_visible
+                    CASE WHEN t.id IS NOT NULL AND ' . self::visible('t') . ' THEN 1 ELSE 0 END AS target_visible,
+                    t.resource_class_id AS target_class_id
              FROM value v
              LEFT JOIN resource t ON t.id = v.value_resource_id
              WHERE v.resource_id IN (' . self::idList($ids) . ') AND v.is_public = 1

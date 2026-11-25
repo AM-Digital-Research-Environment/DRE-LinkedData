@@ -187,7 +187,10 @@ test('a batch asks for its own properties and classes, once', function (): void 
     $requested = $source->propertyRequests[0];
     sort($requested);
     assertSameValue([1, 3, 7, 10, 12, 106, 110, 111, 112, 200, 346, 500, 660, 661, 663, 666], $requested, 'exactly the properties the batch uses');
-    assertSameValue([[40]], $source->classRequests, 'only the person has a class');
+    assertSameValue(1, count($source->classRequests), 'one class lookup per batch');
+    $classes = $source->classRequests[0];
+    sort($classes);
+    assertSameValue([5, 40], $classes, 'the person\'s class and that of the linked subject');
 
     amiraProjector($source)->describe([]);
     assertSameValue(1, count($source->propertyRequests), 'an empty batch looks nothing up');
@@ -278,4 +281,96 @@ test('numeric intervals are plain literals', function (): void {
     assertContainsText('<http://purl.org/dc/terms/created> "1975-03/1980" .', projectedLines(7400));
     $literal = ResourceProjector::literal('numeric:interval', ' 1975-03-12/1980 ', 'en');
     assertSameValue(['1975-03-12/1980', null, null], [$literal->value, $literal->language, $literal->datatype]);
+});
+
+/**
+ * The fixture plus what the role and class rules need: an organisation, a
+ * place and a Type of Resource record, and research item 7392 linking them
+ * through MARC relators and dcterms:type.
+ */
+function rolesSource(): FakeSource
+{
+    $source = amiraSource();
+    $source->propertyMap += [
+        8 => ['iri' => 'http://purl.org/dc/terms/type', 'term' => 'dcterms:type'],
+        501 => ['iri' => 'http://id.loc.gov/vocabulary/relators/spn', 'term' => 'marcrel:spn'],
+        502 => ['iri' => 'http://id.loc.gov/vocabulary/relators/pup', 'term' => 'marcrel:pup'],
+        503 => ['iri' => 'http://id.loc.gov/vocabulary/relators/ctb', 'term' => 'marcrel:ctb'],
+        504 => ['iri' => 'http://id.loc.gov/vocabulary/relators/ivr', 'term' => 'marcrel:ivr'],
+    ];
+    $source->classMap += [
+        42 => 'http://xmlns.com/foaf/0.1/Organization',
+        43 => 'http://purl.org/dc/terms/Location',
+    ];
+    $row = static fn (int $id, int $template, int $class, string $title): array => [
+        'id' => $id, 'resource_type' => DRELinkedData\Projection\OmekaSource::ITEM, 'title' => $title,
+        'resource_class_id' => $class, 'resource_template_id' => $template, 'title_property_id' => null,
+        'created' => '2026-03-26 10:11:06', 'modified' => '2026-06-09 05:37:09',
+    ];
+    array_push(
+        $source->resourceRows,
+        $row(150, 2, 42, 'Iwalewahaus'),
+        $row(151, 3, 43, 'Oshogbo'),
+        $row(8, 6, 5, 'Text'),
+    );
+    $link = static fn (int $property, int $target, int $visible, ?int $class): array => [
+        'resource_id' => 7392, 'property_id' => $property, 'type' => 'resource:item', 'lang' => null,
+        'value' => null, 'uri' => null, 'value_resource_id' => $target, 'target_visible' => $visible,
+        'target_class_id' => $class,
+    ];
+    array_push(
+        $source->valueRows,
+        $link(8, 8, 1, 5),          // Type of Resource: Text
+        $link(501, 150, 1, 42),     // sponsor: an organisation
+        $link(502, 151, 1, 43),     // place of publication: not an agent
+        $link(503, 149, 1, 40),     // contributor: the author again
+        $link(504, 149, 1, 40),     // interviewer: an RDA creator role
+        $link(503, 9998, 0, 40),    // contributor hidden from the public
+    );
+    return $source;
+}
+
+test('a role link to a person or organisation is also a generic creator or contributor', function (): void {
+    $nt = projectedLines(7392, rolesSource());
+    $creator = '<http://purl.org/dc/terms/creator>';
+    $contributor = '<http://purl.org/dc/terms/contributor>';
+    assertContainsText(R . '7392> <http://id.loc.gov/vocabulary/relators/spn> ' . R . '150> .', $nt, 'the role itself stays');
+    assertContainsText(R . '7392> ' . $contributor . ' ' . R . '150> .', $nt, 'a sponsor is a contributor');
+    assertContainsText(R . '7392> ' . $contributor . ' ' . R . '149> .', $nt, 'marcrel:ctb is a contributor');
+    assertContainsText(R . '7392> ' . $creator . ' ' . R . '149> .', $nt);
+    assertSameValue(1, substr_count($nt, R . '7392> ' . $creator . ' ' . R . '149> .'), 'author list, marcrel:aut and marcrel:ivr state one creator triple');
+    assertNotContainsText($contributor . ' ' . R . '151>', $nt, 'a place is not an agent');
+    assertNotContainsText($creator . ' ' . R . '151>', $nt);
+    assertNotContainsText('9998', $nt, 'a hidden agent stays out entirely');
+});
+
+test('a role link is generalised only from a role vocabulary', function (): void {
+    $config = moduleConfig()['projection'];
+    $config['agent_roles']['property_namespaces'] = [];
+    $projector = new ResourceProjector(rolesSource(), fixtureUris(), new IdentityLinks($config['identity_links']), $config);
+    $nt = (new NTriplesSerializer())->serialize($projector->describeOne(7392)->triples);
+    assertNotContainsText('<http://purl.org/dc/terms/contributor>', $nt);
+    assertSameValue(1, substr_count($nt, '<http://purl.org/dc/terms/creator>'), 'only the author list\'s creator remains');
+});
+
+test('a research item is a dre:ResearchItem with the DCMI Type of its Type of Resource', function (): void {
+    $type = '<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>';
+    $nt = projectedLines(7392, rolesSource());
+    assertContainsText(R . '7392> ' . $type . ' <https://schema.org/CreativeWork> .', $nt, 'the fallback class stays');
+    assertContainsText(R . '7392> ' . $type . ' <https://data.africamultiple.uni-bayreuth.de/ontology/dre#ResearchItem> .', $nt);
+    assertContainsText(R . '7392> ' . $type . ' <http://purl.org/dc/dcmitype/Text> .', $nt);
+    assertContainsText(R . '7392> <http://purl.org/dc/terms/type> ' . R . '8> .', $nt, 'the link itself stays');
+    assertNotContainsText('dcmitype/Text', projectedLines(7392), 'no type value, no DCMI Type');
+    assertNotContainsText('ResearchItem', projectedLines(7401), 'other templates are not research items');
+    assertNotContainsText('ResearchItem', projectedLines(149, rolesSource()));
+});
+
+test('a hidden Type of Resource gives no class', function (): void {
+    $source = rolesSource();
+    foreach ($source->valueRows as $i => $row) {
+        if ($row['resource_id'] === 7392 && $row['property_id'] === 8) {
+            $source->valueRows[$i]['target_visible'] = 0;
+        }
+    }
+    assertNotContainsText('dcmitype/Text', projectedLines(7392, $source));
 });

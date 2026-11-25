@@ -37,9 +37,15 @@ use DRELinkedData\Rdf\Vocab;
  *     a concept gets skos:prefLabel and skos:inScheme its item sets, which
  *     are typed skos:ConceptScheme, and an item with no class at all gets a
  *     fallback (schema:CreativeWork).
+ *   • Items on a configured template get its classes (research items:
+ *     dre:ResearchItem), and a finer class from a linked value where one is
+ *     mapped (their Type of Resource → a DCMI Type).
  *   • List properties (bibo:authorList, bibo:editorList) become real rdf:Lists
  *     on hash IRIs, in Omeka's value order, plus a flat dcterms:creator /
  *     dcterms:contributor for each linked member.
+ *   • A role property (the MARC relators) linking a person or organisation is
+ *     also stated as dcterms:creator (the RDA creator roles) or
+ *     dcterms:contributor (every other role), never twice.
  *   • Coordinates are xsd:decimal.
  *   • Item-set membership is schema:isPartOf, kept apart from dcterms:isPartOf,
  *     which the sync already uses for "parent project".
@@ -81,6 +87,25 @@ final class ResourceProjector
     /** @var string[] class IRIs published as skos:Concept */
     private readonly array $conceptClasses;
 
+    /** @var array<int,string[]> template id => class IRIs */
+    private readonly array $templateClasses;
+
+    /** @var array{property:string,templates:array<int,true>,classes:array<int,string>} */
+    private readonly array $typeClasses;
+
+    /** @var string[] namespaces whose properties are agent roles */
+    private readonly array $roleNamespaces;
+
+    /** @var array<string,true> class IRIs of agents */
+    private readonly array $agentClasses;
+
+    /** @var array<string,true> role property IRIs that make a creator */
+    private readonly array $creatorRoles;
+
+    private readonly ?Iri $creatorPredicate;
+
+    private readonly ?Iri $contributorPredicate;
+
     /**
      * @param array<string,mixed> $config the 'projection' config block
      */
@@ -100,6 +125,24 @@ final class ResourceProjector
         $this->listProperties = (array) ($config['list_properties'] ?? []);
         $this->decimalProperties = array_fill_keys((array) ($config['decimal_properties'] ?? []), true);
         $this->literalProperties = array_fill_keys((array) ($config['literal_properties'] ?? []), true);
+        $this->templateClasses = array_map(
+            static fn ($classes): array => array_values(array_map('strval', (array) $classes)),
+            (array) ($config['template_classes'] ?? [])
+        );
+        $typeClasses = (array) ($config['type_classes'] ?? []);
+        $this->typeClasses = [
+            'property' => (string) ($typeClasses['property'] ?? ''),
+            'templates' => array_fill_keys(array_map('intval', (array) ($typeClasses['templates'] ?? [])), true),
+            'classes' => array_map('strval', (array) ($typeClasses['classes'] ?? [])),
+        ];
+        $roles = (array) ($config['agent_roles'] ?? []);
+        $this->roleNamespaces = array_values(array_filter(array_map('strval', (array) ($roles['property_namespaces'] ?? []))));
+        $this->agentClasses = array_fill_keys(array_map('strval', (array) ($roles['agent_classes'] ?? [])), true);
+        $this->creatorRoles = array_fill_keys(array_map('strval', (array) ($roles['creator_roles'] ?? [])), true);
+        $creator = (string) ($roles['creator_predicate'] ?? '');
+        $contributor = (string) ($roles['contributor_predicate'] ?? '');
+        $this->creatorPredicate = Iri::isAbsolute($creator) ? new Iri($creator) : null;
+        $this->contributorPredicate = Iri::isAbsolute($contributor) ? new Iri($contributor) : null;
         $concept = Vocab::SKOS . 'Concept';
         $this->conceptClasses = array_values(array_unique(array_merge(
             [$concept],
@@ -151,6 +194,15 @@ final class ResourceProjector
         foreach ($rows as $row) {
             if ($row['resource_class_id'] !== null) {
                 $classIds[(int) $row['resource_class_id']] = true;
+            }
+        }
+        // The classes of visible linked resources too: they decide whether a
+        // role link points at an agent.
+        foreach ($values as $resourceValues) {
+            foreach ($resourceValues as $value) {
+                if (($value['target_class_id'] ?? null) !== null && (int) $value['target_visible'] === 1) {
+                    $classIds[(int) $value['target_class_id']] = true;
+                }
             }
         }
         // Only the vocabulary terms this batch uses, not the whole tables.
@@ -249,7 +301,7 @@ final class ResourceProjector
         $templateId = $row['resource_template_id'] !== null ? (int) $row['resource_template_id'] : null;
         $triples = new TripleSet();
 
-        $classIris = $this->classIris($row, $kind, $classes, $isConceptScheme);
+        $classIris = $this->classIris($row, $kind, $classes, $isConceptScheme, $values, $properties);
         $type = new Iri(Vocab::RDF_TYPE);
         foreach ($classIris as $class) {
             $triples->add($subject, $type, new Iri($class));
@@ -263,6 +315,7 @@ final class ResourceProjector
 
         $links = [];
         $lists = [];
+        $roles = [];
         foreach ($values as $value) {
             $property = $properties[(int) $value['property_id']] ?? null;
             if ($property === null || isset($this->excludedTerms[$property['term']])) {
@@ -281,26 +334,35 @@ final class ResourceProjector
             if ($link !== null) {
                 $links[] = $link;
             }
+            $roles[] = [$property['iri'], $value];
         }
         $this->addLists($triples, $subject, $lists);
+        // After the lists, so a person both in bibo:authorList and marcrel:aut
+        // keeps the list's dcterms:creator and gains no second statement.
+        foreach ($roles as [$propertyIri, $value]) {
+            $this->addAgentRole($triples, $subject, $propertyIri, $value, $classes);
+        }
         $this->addStructure($triples, $subject, $kind, $itemSetIds, $mediaIds, $media);
 
         $modifiedAt = $row['modified'] ?? $row['created'] ?? null;
         $this->addRecordPage($triples, $subject, $id, $kind, $modifiedAt);
 
-        return new ResourceDescription($id, $kind, $modifiedAt, $triples->all(), $links);
+        return new ResourceDescription($id, $kind, $modifiedAt, $triples->all(), $links, $templateId, $itemSetIds);
     }
 
     /**
      * The published classes: the resource class (or its replacement), the
      * kind's own classes, skos:ConceptScheme for an item set holding
-     * concepts, and the fallback for an item with none of these.
+     * concepts, the fallback for an item with none of these, then the
+     * template's own classes and the class its typing value maps to.
      *
      * @param array<string,mixed> $row
      * @param array<int,string> $classes
+     * @param array<int,array<string,mixed>> $values the public values
+     * @param array<int,array{iri:string,term:string}> $properties
      * @return string[]
      */
-    private function classIris(array $row, string $kind, array $classes, bool $isConceptScheme): array
+    private function classIris(array $row, string $kind, array $classes, bool $isConceptScheme, array $values = [], array $properties = []): array
     {
         $classIris = [];
         if ($row['resource_class_id'] !== null && isset($classes[(int) $row['resource_class_id']])) {
@@ -314,7 +376,58 @@ final class ResourceProjector
         if (!$classIris && $kind === ResourceDescription::ITEM) {
             $classIris = $this->itemFallbackClasses;
         }
-        return $classIris;
+        if ($kind !== ResourceDescription::ITEM || $row['resource_template_id'] === null) {
+            return $classIris;
+        }
+        $templateId = (int) $row['resource_template_id'];
+        array_push($classIris, ...($this->templateClasses[$templateId] ?? []));
+        if (isset($this->typeClasses['templates'][$templateId])) {
+            foreach ($values as $value) {
+                $term = $properties[(int) $value['property_id']]['term'] ?? null;
+                $target = $value['value_resource_id'] !== null && (int) $value['target_visible'] === 1
+                    ? (int) $value['value_resource_id']
+                    : null;
+                if ($term === $this->typeClasses['property'] && $target !== null && isset($this->typeClasses['classes'][$target])) {
+                    $classIris[] = $this->typeClasses['classes'][$target];
+                }
+            }
+        }
+        return array_values(array_unique($classIris));
+    }
+
+    /**
+     * The generic statement for a role link: dcterms:creator for a creator
+     * role, dcterms:contributor for any other, when the property is a role
+     * and the linked resource is a visible agent. The TripleSet keeps it
+     * single when one agent holds several roles or is already listed.
+     *
+     * @param array<string,mixed> $value
+     * @param array<int,string> $classes the batch's resource classes, by id
+     */
+    private function addAgentRole(TripleSet $triples, Iri $subject, string $propertyIri, array $value, array $classes): void
+    {
+        if ($value['value_resource_id'] === null || (int) $value['target_visible'] !== 1 || !$this->isRole($propertyIri)) {
+            return;
+        }
+        $targetClassId = $value['target_class_id'] ?? null;
+        $targetClass = $targetClassId !== null ? ($classes[(int) $targetClassId] ?? null) : null;
+        if ($targetClass === null || !isset($this->agentClasses[$targetClass])) {
+            return;
+        }
+        $predicate = isset($this->creatorRoles[$propertyIri]) ? $this->creatorPredicate : $this->contributorPredicate;
+        if ($predicate !== null) {
+            $triples->add($subject, $predicate, $this->uris->resource((int) $value['value_resource_id']));
+        }
+    }
+
+    private function isRole(string $propertyIri): bool
+    {
+        foreach ($this->roleNamespaces as $namespace) {
+            if (str_starts_with($propertyIri, $namespace)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

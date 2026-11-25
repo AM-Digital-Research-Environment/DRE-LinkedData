@@ -18,6 +18,7 @@ final class ResourceDescription
     /**
      * @param Triple[] $triples
      * @param array<int,array{authority:string,predicate:string}> $identityLinks one entry per link triple
+     * @param int[] $itemSetIds the public item sets an item belongs to
      */
     public function __construct(
         public readonly int $id,
@@ -25,6 +26,9 @@ final class ResourceDescription
         public readonly ?string $modified,
         public readonly array $triples,
         public readonly array $identityLinks = [],
+        /** The resource template, which (with the item sets) decides the dump's named graph. */
+        public readonly ?int $templateId = null,
+        public readonly array $itemSetIds = [],
     ) {
     }
 

@@ -154,6 +154,42 @@ return [
             // items carry no resource class in Omeka.
             'item_fallback_classes' => ['https://schema.org/CreativeWork'],
 
+            // rdf:type added to every item on a resource template, beside the
+            // classes above. Research items (template 10) carry no resource
+            // class in Omeka, so schema:CreativeWork alone did not tell them
+            // from anything else without one; dre:ResearchItem does. The class
+            // is declared in the dre: ontology, which omeka-s-docker maintains
+            // (deploy/amira/vocabularies/build_dre_vocabulary.py).
+            'template_classes' => [
+                10 => ['https://data.africamultiple.uni-bayreuth.de/ontology/dre#ResearchItem'],
+            ],
+
+            // A finer class from a linked value: on the templates listed, an
+            // item whose `property` links one of these records also gets its
+            // class. Research items carry exactly one Type of Resource (item
+            // set 1, MODS typeOfResource values), each mapped to the DCMI Type
+            // its own definition names, following DCMI's examples (maps and
+            // notated music are dctype:Image, manuscripts and bibliographies
+            // dctype:Text). Digital, Multimedia, Mixed material, Tactile and
+            // Unspecified have no single DCMI Type and add nothing.
+            'type_classes' => [
+                'property' => 'dcterms:type',
+                'templates' => [10],
+                'classes' => [
+                    2 => 'http://purl.org/dc/dcmitype/PhysicalObject', // Artefact
+                    3 => 'http://purl.org/dc/dcmitype/Sound',          // Audio
+                    4 => 'http://purl.org/dc/dcmitype/Image',          // Notated music
+                    5 => 'http://purl.org/dc/dcmitype/Image',          // Cartographic
+                    6 => 'http://purl.org/dc/dcmitype/StillImage',     // Image
+                    7 => 'http://purl.org/dc/dcmitype/MovingImage',    // Moving image
+                    8 => 'http://purl.org/dc/dcmitype/Text',           // Text
+                    9 => 'http://purl.org/dc/dcmitype/Text',           // Manuscript
+                    10 => 'http://purl.org/dc/dcmitype/Text',          // Bibliography
+                    11 => 'http://purl.org/dc/dcmitype/Dataset',       // Dataset
+                    10309 => 'http://purl.org/dc/dcmitype/Collection', // Collection
+                ],
+            ],
+
             // Resource classes published as another class. Authority Resources
             // (subjects, languages, genres, …) are classed fabio:AuthorityFile in
             // Omeka, a FaBiO *document*; they are concepts. A skos:Concept also
@@ -169,6 +205,36 @@ return [
             'list_properties' => [
                 'bibo:authorList' => 'http://purl.org/dc/terms/creator',
                 'bibo:editorList' => 'http://purl.org/dc/terms/contributor',
+            ],
+
+            // Generic agent links. A role property (any property of these
+            // vocabularies: the MARC relators, 305 in Omeka's copy) linking a
+            // visible person or organisation is also stated as dcterms:creator
+            // or dcterms:contributor, so "everything linked to a person" does
+            // not need the forty-odd role codes the data uses. Library of
+            // Congress declares every relator rdfs:subPropertyOf
+            // dc:contributor, and lists the creator roles in its RDA Creator
+            // collection (`collection_RDACreator`); those 23 are the creator
+            // roles here, checked against id.loc.gov on 25 November 2026. A link
+            // to anything else (a place, through marcrel:pup) gets no generic
+            // statement, nor does a literal name.
+            'agent_roles' => [
+                'property_namespaces' => ['http://id.loc.gov/vocabulary/relators/'],
+                'agent_classes' => [
+                    'http://xmlns.com/foaf/0.1/Agent',
+                    'http://xmlns.com/foaf/0.1/Person',
+                    'http://xmlns.com/foaf/0.1/Organization',
+                    'http://xmlns.com/foaf/0.1/Group',
+                ],
+                'creator_predicate' => 'http://purl.org/dc/terms/creator',
+                'contributor_predicate' => 'http://purl.org/dc/terms/contributor',
+                'creator_roles' => array_map(
+                    static fn (string $code): string => 'http://id.loc.gov/vocabulary/relators/' . $code,
+                    [
+                        'arc', 'art', 'aus', 'aut', 'chr', 'cmp', 'com', 'cre', 'ctg', 'dsr', 'enj', 'fmk',
+                        'inv', 'ive', 'ivr', 'lbt', 'lsa', 'ltr', 'pht', 'pra', 'prg', 'rsp', 'scl',
+                    ]
+                ),
             ],
 
             // Literals published as xsd:decimal when they are plain decimals.

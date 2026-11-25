@@ -84,6 +84,8 @@ function amiraSource(): FakeSource
         $resource(7401, OmekaSource::ITEM, 'Generic title', 11, null, '2026-06-09 05:37:09', 346),
     ];
 
+    // target_class_id is the linked resource's class, as the query reports it.
+    $classOf = array_column($source->resourceRows, 'resource_class_id', 'id');
     $value = static fn (int $resource, int $property, string $type, ?string $text, ?string $uri = null, ?int $link = null, int $visible = 0, ?string $lang = null): array => [
         'resource_id' => $resource,
         'property_id' => $property,
@@ -93,6 +95,7 @@ function amiraSource(): FakeSource
         'uri' => $uri,
         'value_resource_id' => $link,
         'target_visible' => $link === null ? 0 : $visible,
+        'target_class_id' => $link === null ? null : ($classOf[$link] ?? null),
     ];
     $source->valueRows = [
         $value(149, 1, 'literal', 'Ulli Beier'),
