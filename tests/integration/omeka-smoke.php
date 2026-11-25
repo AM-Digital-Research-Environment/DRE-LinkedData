@@ -176,7 +176,7 @@ try {
             'CREATE TABLE site_page (id INTEGER PRIMARY KEY, site_id INTEGER, slug VARCHAR(190), is_public INTEGER)',
             'CREATE TABLE site_page_block (id INTEGER PRIMARY KEY, page_id INTEGER, layout VARCHAR(80), position INTEGER)',
             'CREATE TABLE media (id INTEGER PRIMARY KEY, item_id INTEGER, ingester VARCHAR(255), source TEXT, media_type VARCHAR(190),
-                storage_id VARCHAR(190), extension VARCHAR(255), has_original INTEGER, position INTEGER)',
+                storage_id VARCHAR(190), extension VARCHAR(255), has_original INTEGER, has_thumbnails INTEGER, position INTEGER)',
             'CREATE TABLE item_item_set (item_id INTEGER, item_set_id INTEGER)',
             'CREATE TABLE value (id INTEGER PRIMARY KEY, resource_id INTEGER, property_id INTEGER, value_resource_id INTEGER,
                 type VARCHAR(255), lang VARCHAR(255), value TEXT, uri TEXT, is_public INTEGER)',
@@ -217,8 +217,8 @@ try {
             'created' => '2026-01-01 00:00:00', 'modified' => '2026-06-09 05:37:09',
         ]);
     }
-    foreach ([[4, 1, 'upload', 'internal-name.tif', 'image/jpeg', 'abc', 'jpg', 1, 1], [5, 2, 'upload', 'x.tif', 'image/jpeg', 'def', 'jpg', 1, 1], [6, 1, 'upload', 'y.tif', 'image/jpeg', 'ghi', 'jpg', 1, 2]] as $m) {
-        $connection->insert('media', array_combine(['id', 'item_id', 'ingester', 'source', 'media_type', 'storage_id', 'extension', 'has_original', 'position'], $m));
+    foreach ([[4, 1, 'upload', 'internal-name.tif', 'image/jpeg', 'abc', 'jpg', 1, 1, 1], [5, 2, 'upload', 'x.tif', 'image/jpeg', 'def', 'jpg', 1, 1, 1], [6, 1, 'upload', 'y.tif', 'image/jpeg', 'ghi', 'jpg', 1, 0, 2]] as $m) {
+        $connection->insert('media', array_combine(['id', 'item_id', 'ingester', 'source', 'media_type', 'storage_id', 'extension', 'has_original', 'has_thumbnails', 'position'], $m));
     }
     $connection->insert('item_item_set', ['item_id' => 7, 'item_set_id' => 3]);
     $connection->insert('item_item_set', ['item_id' => 7, 'item_set_id' => 8]);
@@ -348,6 +348,7 @@ try {
     smokeAssert(!str_contains($writer->write($projector->describeOne(3)->triples, Format::NTriples), 'ConceptScheme'), 'A plain item set is no scheme.');
     $media = $writer->write($projector->describeOne(4)->triples, Format::NTriples);
     smokeAssert(str_contains($media, '<https://example.test/files/original/abc.jpg>'), 'Media file URL missing.');
+    smokeAssert(str_contains($media, '<https://schema.org/thumbnailUrl> <https://example.test/files/medium/abc.jpg>'), 'Media thumbnail URL missing.');
     smokeAssert(!str_contains($media, 'internal-name'), 'An upload filename leaked.');
 
     // ── Every format parses to the same graph ─────────────────────────────

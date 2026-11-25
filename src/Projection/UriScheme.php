@@ -168,6 +168,15 @@ final class UriScheme
         return new Iri($this->voidDocument() . '#graph-' . rawurlencode($key));
     }
 
+    /**
+     * The thumbnail Omeka derived from a media: always JPEG, at files/{size}/.
+     * Medium (Omeka's 400px default) is the one a card or a list shows.
+     */
+    public function thumbnailFile(string $storageId, string $size = 'medium'): Iri
+    {
+        return new Iri($this->base . '/files/' . rawurlencode($size) . '/' . rawurlencode($storageId) . '.jpg');
+    }
+
     public function originalFile(string $storageId, ?string $extension): Iri
     {
         $extension = trim((string) $extension);

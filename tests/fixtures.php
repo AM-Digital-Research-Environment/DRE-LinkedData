@@ -156,7 +156,7 @@ function amiraSource(): FakeSource
     $source->mediaRows = [
         [
             'id' => 8001, 'item_id' => 7392, 'ingester' => 'upload', 'source' => 'KG_00001_scan_internal.tif',
-            'media_type' => 'image/jpeg', 'storage_id' => 'a1b2c3', 'extension' => 'jpg', 'has_original' => 1,
+            'media_type' => 'image/jpeg', 'storage_id' => 'a1b2c3', 'extension' => 'jpg', 'has_original' => 1, 'has_thumbnails' => 1,
         ],
         [
             'id' => 8002, 'item_id' => 7392, 'ingester' => 'youtube', 'source' => 'https://www.youtube.com/watch?v=abc123',

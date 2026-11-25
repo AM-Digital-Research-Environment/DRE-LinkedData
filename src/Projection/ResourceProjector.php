@@ -578,6 +578,11 @@ final class ResourceProjector
         if ((int) $media['has_original'] === 1 && $storageId !== '') {
             $triples->add($subject, Vocab::iri(Vocab::SCHEMA, 'contentUrl'), $this->uris->originalFile($storageId, $media['extension'] ?? null));
         }
+        // Omeka derives thumbnails from images, PDFs and web media alike, and
+        // the API lists them for any public media: so does the RDF.
+        if ((int) ($media['has_thumbnails'] ?? 0) === 1 && $storageId !== '') {
+            $triples->add($subject, Vocab::iri(Vocab::SCHEMA, 'thumbnailUrl'), $this->uris->thumbnailFile($storageId));
+        }
         $mediaType = trim((string) ($media['media_type'] ?? ''));
         if ($mediaType !== '') {
             $triples->add($subject, Vocab::iri(Vocab::SCHEMA, 'encodingFormat'), new Literal($mediaType));

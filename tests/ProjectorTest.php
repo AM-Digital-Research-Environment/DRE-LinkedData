@@ -374,3 +374,9 @@ test('a hidden Type of Resource gives no class', function (): void {
     }
     assertNotContainsText('dcmitype/Text', projectedLines(7392, $source));
 });
+
+test('a media with thumbnails states its medium thumbnail; one without states none', function (): void {
+    $scan = projectedLines(8001);
+    assertContainsText(R . '8001> <https://schema.org/thumbnailUrl> <' . FIXTURE_BASE . '/files/medium/a1b2c3.jpg> .', $scan);
+    assertNotContainsText('thumbnailUrl', projectedLines(8002), 'the YouTube media has no stored thumbnail');
+});

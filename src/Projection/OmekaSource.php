@@ -173,7 +173,7 @@ class OmekaSource
             return [];
         }
         return $this->connection->fetchAllAssociative(
-            'SELECT m.id, m.item_id, m.ingester, m.source, m.media_type, m.storage_id, m.extension, m.has_original
+            'SELECT m.id, m.item_id, m.ingester, m.source, m.media_type, m.storage_id, m.extension, m.has_original, m.has_thumbnails
              FROM media m
              WHERE m.id IN (' . self::idList($mediaIds) . ')
              ORDER BY m.id'
