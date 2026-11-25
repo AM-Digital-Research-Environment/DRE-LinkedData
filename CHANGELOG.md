@@ -6,6 +6,54 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Generic agent links.** A MARC relator (`marcrel:aut`, `marcrel:rtm`, `marcrel:spn`, …:
+  any property of the relators vocabulary) that links a public person or organisation is
+  also stated as `dcterms:creator`, for the 23 roles the Library of Congress lists in its RDA
+  Creator collection, or `dcterms:contributor`, for every other role. "Everything linked to
+  this person" no longer needs the forty-odd role codes the data uses: about 8,700 links on
+  today's data, most of them on research items, which had no generic statement at all. A
+  link to a place (`marcrel:pup`) or a literal name gets none, and an agent already in
+  `bibo:authorList` keeps one `dcterms:creator`. Configurable as `projection.agent_roles`.
+- **Research items have a class of their own.** Items on the research-item template
+  (template 10) are `dre:ResearchItem` beside `schema:CreativeWork`, and their Type of
+  Resource adds its DCMI Type (`dctype:Text`, `dctype:StillImage`, `dctype:MovingImage`,
+  `dctype:Sound`, `dctype:Image`, `dctype:PhysicalObject`, `dctype:Dataset`,
+  `dctype:Collection`). Configurable as `projection.template_classes` and
+  `projection.type_classes`. The class has to be added to the `dre:` ontology, which
+  omeka-s-docker generates (`deploy/amira/vocabularies/build_dre_vocabulary.py`).
+- **An N-Quads dump with one named graph per kind of record**, written by the same run as
+  the N-Triples dump and served at `/linked-data/dump.nq.gz`: research items, publications,
+  persons, organisations, research sections, projects, concepts, places, journals and
+  series, podcasts, videos, Cluster Chronicles, item sets, media and other records, each
+  graph named `/linked-data/void#graph-{name}`. Each triple sits in one graph, so a store
+  reading its default graph as the union of the graphs answers existing queries unchanged.
+  The mapping is `dump.graphs`. `state.json` gains `nquads_sha256`, `nquads_bytes` and
+  `graphs`; its `sha256` still describes the N-Triples dump.
+- **The VoID describes the N-Quads dump** as a second `dcat:Distribution` and each named
+  graph as a `void:subset` with its title, triples and entities. `void:dataDump` still names
+  only the N-Triples dump.
+- **"How the data is modelled" on the page block**: the kinds of record with their classes
+  and named graphs, the predicates that link them, and how to find everything that points at
+  a record. The block also offers the N-Quads download.
+- **Example queries that follow links**: everything linked to a person whatever the role,
+  the records of a project and who worked on them, projects by research section with their
+  investigators, records about a subject, subjects that occur together, places of origin
+  with coordinates, where research items are held, research items by type, publications
+  with their authors, Wikidata matches by class, and the named graphs. Sixteen in all,
+  replacing five that only counted classes or listed one kind of record.
+- **Media thumbnails.** A media with thumbnails states `schema:thumbnailUrl` (Omeka's medium
+  JPEG). A comparison of the public API with the RDF, over two records of each template plus
+  item sets and media, found no other public value missing apart from the known gaps (value
+  annotations, full texts).
+
+### Changed
+
+- `dreLinkedData()->dataset()['distributions']` lists the N-Quads dump after the N-Triples
+  one, once a dump has been written with it. The first entry is unchanged, and DRE SEO's
+  schema.org `Dataset` gains a second `DataDownload`.
+
 ## [0.7.0] - 2026-11-11
 
 ### Added

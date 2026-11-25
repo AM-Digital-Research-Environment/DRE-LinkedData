@@ -24,7 +24,8 @@ This module publishes the same records properly:
   the record page and RDF clients to Turtle, N-Triples, JSON-LD or RDF/XML.
 - **A clean RDF projection** of each record, with identity links to the authorities.
 - **A full dump** as gzipped N-Triples, ready to load into a triplestore such as Apache Jena
-  Fuseki or Oxigraph.
+  Fuseki or Oxigraph, and the same statements as N-Quads with one named graph per kind of
+  record (research items, publications, persons, places, …).
 - **A VoID/DCAT description** of the dataset for Linked Data tools and data catalogues,
   advertising a SPARQL endpoint loaded from the dump when one is configured.
 - **A "Linked open data" page block** that explains all of it to visitors, in the DRE theme,
@@ -114,9 +115,11 @@ modification date.
 | Wikidata / GND / LCSH identifiers | `dcterms:identifier` holding the URI | `dcterms:identifier` as a string (its range is `rdfs:Literal`), plus `owl:sameAs` / `skos:exactMatch` |
 | Other URIs in `dcterms:identifier` (YouTube playlists, GEPRIS) | `dcterms:identifier` holding the URI | `dcterms:identifier` as a string, plus `rdfs:seeAlso` the URI |
 | Item-set membership | `o:item_set` | `schema:isPartOf` |
-| Media | `o:media` | `schema:associatedMedia`; the media states `schema:contentUrl`, `schema:encodingFormat` and the work it encodes |
+| Media | `o:media` | `schema:associatedMedia`; the media states `schema:contentUrl`, `schema:thumbnailUrl`, `schema:encodingFormat` and the work it encodes |
 | Authority Resources | `fabio:AuthorityFile` | `skos:Concept`, with `skos:prefLabel` and `skos:inScheme` (its item sets, which are typed `skos:ConceptScheme`) |
 | Items with no class | no `rdf:type` | `schema:CreativeWork` |
+| Research items (template 10) | no `rdf:type` | `schema:CreativeWork`, `dre:ResearchItem` and the DCMI Type of their Type of Resource (`dctype:Text`, `dctype:Sound`, …) |
+| Role links (`marcrel:aut`, `marcrel:rtm`, `marcrel:spn`, … to a person or organisation) | one value per role | the role, plus `dcterms:creator` (creator roles) or `dcterms:contributor` (every other role) |
 | `bibo:authorList`, `bibo:editorList` | one value per person | an `rdf:List` in Omeka's order, on hash IRIs (`/resource/{id}#authorList-1`, …), plus `dcterms:creator` / `dcterms:contributor` for each linked person |
 | DOIs | `bibo:doi` holding a `https://doi.org/` URL | the bare DOI in `bibo:doi`, plus `schema:sameAs` its `https://doi.org/` IRI |
 | Full text and transcripts (`bibo:content`) | included | dropped |
@@ -188,11 +191,84 @@ them never turns into a fragment or a query.
 
 Value annotations (such as a contributor's affiliation for one item) are not projected yet.
 
+### Kinds of record and how they link
+
+Every record has the same kind of URI, `/resource/{id}`, whatever it is: kind is said by
+class, and in the N-Quads dump by named graph, never by the identifier. (Authority records
+get merged, so their Omeka ids are not the stable identifiers a typed URI such as
+`/person/{id}` would promise; those are left to the cluster's future central registry.)
+
+| Records | Classes | Named graph |
+|---|---|---|
+| Research items | `schema:CreativeWork`, `dre:ResearchItem`, a DCMI Type | `research-items` |
+| Publications | `fabio:JournalArticle`, `fabio:Book`, `fabio:BookChapter`, … | `publications` |
+| Persons | `foaf:Person` | `persons` |
+| Organisations | `foaf:Organization` | `organisations` |
+| Research sections | `frapo:ResearchGroup` | `research-sections` |
+| Projects | `foaf:Project` | `projects` |
+| Subjects, languages, genres and other concepts | `skos:Concept` | `concepts` |
+| Places | `dcterms:Location` | `places` |
+| Journals and series | `bibo:Journal`, `bibo:Series` | `venues` |
+| Podcasts, videos, Cluster Chronicles | `fabio:AudioDocument`, `bibo:AudioVisualDocument`, `fabio:Essay`, … | `podcasts`, `videos`, `chronicles` |
+| Item sets | `dctype:Collection` | `item-sets` |
+| Media | `schema:MediaObject` | `media` |
+
+The links between records, all to other `/resource/{id}` IRIs:
+
+| Predicate | From → to |
+|---|---|
+| `dcterms:creator`, `dcterms:contributor` | record → person or organisation, whatever the role |
+| `marcrel:*` (54 roles on research items: `aut`, `rtm`, `ivr`, `spn`, …) | record → person or organisation, the precise role |
+| `bibo:authorList`, `bibo:editorList` | publication → ordered list of persons |
+| `dcterms:isPartOf` | research item → project; project → research section; publication → journal, book or series; place → country; person → institution |
+| `dcterms:subject` | record → concept, or the person, organisation or place it is about |
+| `dcterms:spatial`, `dcterms:provenance` | record → place of origin; research item → where it is held |
+| `frapo:isFundedBy` | record or project → funder |
+| `dcterms:type`, `dcterms:language`, `dcterms:format`, `dcterms:audience` | record → concept |
+| `foaf:member`, `dcterms:creator` on a project | project or section → members, principal investigators |
+| `owl:sameAs`, `skos:exactMatch` | entity or concept → Wikidata, GND, LoC, ORCID, … |
+
+The page block shows the same tables, with example queries that follow these links.
+
+**Generic agent links.** A role property links a person through the role it was catalogued
+under, so "everything linked to this person" would need every role code. Any property of a
+role vocabulary (`agent_roles.property_namespaces`: the MARC relators) that links a visible
+resource of an agent class (`foaf:Person`, `foaf:Organization`, `foaf:Group`, `foaf:Agent`)
+is also stated as `dcterms:creator` when the role is one of the 23 the Library of Congress
+lists in its RDA Creator collection (`aut`, `cre`, `art`, `cmp`, `pht`, `ive`, `ivr`, …;
+checked on id.loc.gov on 25 November 2026), and as `dcterms:contributor` otherwise, since LoC
+declares every relator a subproperty of `dc:contributor`. A link to anything else (a place of
+publication, `marcrel:pup`) or a literal name gets no generic statement. A person who is
+listed in `bibo:authorList` and holds `marcrel:aut` gets one `dcterms:creator`, not two.
+
+**Research-item classes.** Research items carry no resource class in Omeka. Items on the
+templates of `template_classes` (template 10) get `dre:ResearchItem`, declared in the
+[`dre:` ontology](https://data.africamultiple.uni-bayreuth.de/ontology/dre) (maintained in
+omeka-s-docker, `deploy/amira/vocabularies/build_dre_vocabulary.py`), and their Type of
+Resource maps to a DCMI Type (`type_classes`): Text, Manuscript and Bibliography to
+`dctype:Text`, Image to `dctype:StillImage`, Moving image to `dctype:MovingImage`, Audio to
+`dctype:Sound`, Cartographic and Notated music to `dctype:Image`, Artefact to
+`dctype:PhysicalObject`, Dataset and Collection to their namesakes. Digital, Multimedia,
+Mixed material, Tactile and Unspecified have no single DCMI Type and add none.
+`schema:CreativeWork` stays.
+
 ## The dump
 
 **Modules → DRE Linked Data → Configure → "Generate the dump now"** starts a background job
-that writes every public resource to `files/dre-linked-data/dump.nt.gz`. It is served at
-`/linked-data/dump.nt.gz`. The same run is available from the command line (below).
+that writes every public resource to `files/dre-linked-data/dump.nt.gz`, served at
+`/linked-data/dump.nt.gz`, and the same statements to `files/dre-linked-data/dump.nq.gz`,
+served at `/linked-data/dump.nq.gz`. The same run is available from the command line (below).
+
+**Named graphs.** The N-Quads dump puts each resource, with every triple it is the subject
+of, in the graph of its kind (the table under [Kinds of record](#kinds-of-record-and-how-they-link)).
+Media and item sets go by their type; an item goes to the first graph that names its
+template, else the first that names one of its item sets (publications: item set 29918,
+since their templates grow with each EPrints type), else `other`. The mapping is
+`dump.graphs` in `config/module.config.php`. A graph is named
+`/linked-data/void#graph-{name}`, which is also the VoID subset describing it. Each triple
+is in exactly one graph, so the union of the graphs is the N-Triples dump, and a store that
+reads its default graph as that union (Oxigraph's `--union-default-graph`, Fuseki's
+`tdb2:unionDefaultGraph true`) answers every query written for the N-Triples dump unchanged.
 
 - **Batching.** Resources are read in id-ordered batches of 250, so memory stays flat.
 - **Atomic swap.** The file is written beside the old one and swapped in only when complete,
@@ -231,8 +307,10 @@ to be configured. Exit codes: `0` written (or up to date), `1` failed, `2` bad i
 (not an Omeka root, module inactive, no base URI), `3` another run holds the lock. Run it as
 the user the web server runs as, so the files it writes stay replaceable by the admin job.
 
-**Swapping in.** The new state (`state.json`) is written first, then the dump and the state
-are renamed into place one right after the other. The download's `ETag` is the dump's
+**Swapping in.** The new state (`state.json`) is written first, then the N-Quads dump, the
+N-Triples dump and the state are renamed into place one right after the other.
+`state.json` keeps `sha256` (the N-Triples dump) and adds `nquads_sha256` and `nquads_bytes`,
+flat keys a shell loader can read as it reads `sha256`. The download's `ETag` is the dump's
 SHA-256 only when the state's byte count matches the file actually opened, so even in the
 instant between the two renames a client never gets a checksum for the wrong file.
 
@@ -240,6 +318,8 @@ To load the dump into Apache Jena Fuseki (Jena reads `.gz` directly):
 
 ```bash
 tdb2.tdbloader --loc /fuseki/databases/amira amira-linked-data.nt.gz
+# or, keeping the graphs apart (set tdb2:unionDefaultGraph true on the dataset)
+tdb2.tdbloader --loc /fuseki/databases/amira amira-linked-data.nq.gz
 ```
 
 ### Serving it over SPARQL
@@ -250,7 +330,10 @@ dump, so compare that rather than the file's timestamp. Then put the endpoint's 
 address in the **SPARQL endpoint** setting. The
 [omeka-s-docker](https://github.com/AM-Digital-Research-Environment/omeka-s-docker) template
 ships one as an opt-in service: Oxigraph, read-only, with no network of its own, reloaded
-automatically (`deploy/amira/README.md`, "SPARQL endpoint"). Having no network, it cannot
+automatically (`deploy/amira/README.md`, "SPARQL endpoint"). It loads the N-Triples dump; to
+serve the named graphs it must load `dump.nq.gz` when `state.json` names `nquads_sha256`,
+and start Oxigraph with `--union-default-graph` so queries without `GRAPH` still see
+everything. Having no network, it cannot
 run federated queries: a `SERVICE` clause fails. Wikidata's query service can still reach
 it the other way, from its side, once the endpoint is on its federation allowlist.
 
@@ -277,7 +360,12 @@ description covers:
 - **Figures from the last dump.** `void:triples`, `void:entities` and the vocabularies used.
 - **Distribution.** A `dcat:Distribution` for the dump, with media type, compression,
   byte size and its SHA-256 as an `spdx:Checksum` (`spdx:checksumValue` typed
-  `xsd:hexBinary`), as DCAT 3 recommends.
+  `xsd:hexBinary`), as DCAT 3 recommends, and a second one (`#dump-nquads`) for the N-Quads
+  dump. `void:dataDump` names the N-Triples dump only: VoID reads several dumps as parts of
+  one dataset, and these two are copies.
+- **Named graphs.** Each graph of the N-Quads dump is a `void:subset` of the dataset whose
+  node is the graph's name (`#graph-research-items`, …), with its title, `void:triples` and
+  `void:entities`.
 - **Linksets.** One `void:Linkset` per authority and predicate, with its link count. Its
   `void:objectsTarget` is a `void:Dataset` node for the authority (`#dataset-wikidata`, …)
   with a title, a homepage and the authority's `void:uriSpace`.
@@ -287,13 +375,18 @@ description covers:
 Add **Linked open data** to a site page (a "Data access" page, say). It shows:
 
 - the dataset's figures;
-- the download, with its checksum;
+- the download, with its checksum, and the N-Quads download beside it;
 - the VoID links;
 - how resource URIs work, with a worked example and a `curl` line;
-- with a SPARQL endpoint configured, a query form: the endpoint, five example queries to
-  start from (resources by class, the most frequent subjects and places, people with an
-  ORCID iD, resources linked to Wikidata), a query editor, and the results as a table, with
-  CSV and JSON downloads;
+- how the data is modelled: the kinds of record with their classes and named graphs, and
+  the predicates that link them;
+- with a SPARQL endpoint configured, a query form: the endpoint, sixteen example queries
+  that follow the links (everything linked to a person whatever the role, the records of a
+  project and who worked on them, projects by research section, records about a subject,
+  subjects that occur together, places of origin with coordinates, where research items are
+  held, research items by type, publications with their authors, Wikidata matches by class,
+  people with an ORCID iD, the named graphs, …), a query editor, and the results as a
+  table, with CSV and JSON downloads;
 - the linksets and the vocabulary list.
 
 Before the first dump it says so, and still explains the per-resource route, which already
@@ -353,6 +446,9 @@ $this->dreLinkedData($resource);
   one query per resource, remembered for the request.
 - **`downloads`** keeps its first three entries as they always were; RDF/XML is appended as
   the fourth. Consumers that show three formats can slice.
+- **`distributions`** (in `dataset()`) starts with the N-Triples dump as it always has; from
+  0.8.0 the N-Quads dump follows it as a second entry, of type `application/n-quads`, once a
+  dump has been written with it.
 
 ```php
 $this->dreLinkedData();            // no argument: the helper itself
@@ -410,8 +506,10 @@ production runtime, 8.5.
 
 Structural choices — excluded terms, authority patterns (kept in
 `config/identity-authorities.php`, shared with DRE SEO) and DOI properties, which template
-is "concepts", class replacements and the fallback class, list, decimal and literal-range
-properties, the classes added to item sets and media, the batch size, the dataset keywords —
+is "concepts", class replacements and the fallback class, the classes added by template and by
+Type of Resource, the role vocabularies and creator roles of the generic agent links, list,
+decimal and literal-range properties, the classes added to item sets and media, the batch
+size, the named graphs of the N-Quads dump, the dataset keywords —
 are in the `dre_linked_data` block of
 `config/module.config.php`, overridable key by key from Omeka's `config/local.config.php`.
 
@@ -426,7 +524,8 @@ src/Rdf/                        IRI/literal/triple model, prefix map, content ne
 src/Projection/                 OmekaSource (visibility in SQL), ResourceProjector,
                                 IdentityLinks, SameAs, UriScheme
 src/Dump/                       DumpGenerator (streaming job core), DumpStore (files, lock, state),
-                                ChangeTracker (is the dump out of date?)
+                                GraphMap (named graph of each record), ChangeTracker (is the dump
+                                out of date?)
 src/Dataset/                    DatasetDescription (VoID/DCAT), DatasetSummary (view model)
 src/Controller/                 /resource/*, /linked-data/*, /.well-known/void
 src/Job/GenerateDump.php        the background job
@@ -467,8 +566,8 @@ in the integration job; there is no baseline.
 
 - **Value annotations**, as RDF 1.2 triple terms once the triplestores (Fuseki, Oxigraph)
   and the serialisers agree.
-- **Finer classes for research items**, perhaps from their Type of Resource authority,
-  instead of the `schema:CreativeWork` fallback.
+- **Typed identifiers** (`/person/…`, `/subject/…`) only once a central registry mints stable
+  ones: Omeka's ids for authority records change when records are merged.
 - **Wider authority coverage** in the source data (Type of Resource → DCMI Type, languages →
   ISO 639-3), which the identity links will pick up without code changes.
 - **Catalogue registration** of the dataset and its SPARQL endpoint: a Wikidata item for
